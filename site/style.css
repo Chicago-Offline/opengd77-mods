@@ -1,0 +1,69 @@
+:root{
+  --bg:#0f1419; --panel:#171e26; --border:#2a3743;
+  --text:#c9d4de; --dim:#8b9aa7; --accent:#4fb3ff; --ok:#4fd18b; --warn:#f0b64a;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+}
+.wrap{max-width:46rem;margin:0 auto;padding:0 1.25rem}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+
+header.site{border-bottom:1px solid var(--border);padding:1.1rem 0;margin-bottom:3rem}
+header.site .wrap{display:flex;align-items:center;gap:.7rem}
+header.site img{width:26px;height:26px;display:block}
+header.site a.home{color:var(--text);font-weight:600;letter-spacing:.01em}
+header.site .calls{margin-left:auto;color:var(--dim);font:12px/1 var(--mono)}
+
+h1{font-size:1.95rem;line-height:1.25;margin:0 0 .6rem;letter-spacing:-.015em}
+h2{font-size:1.2rem;margin:2.6rem 0 .7rem;letter-spacing:-.01em}
+h3{font-size:1rem;margin:1.8rem 0 .5rem;color:var(--text)}
+p{margin:0 0 1.05rem}
+.lede{font-size:1.1rem;color:#dbe4ec;margin-bottom:1.6rem}
+.dim{color:var(--dim)}
+small,.meta{color:var(--dim);font-size:.85rem}
+
+ul,ol{margin:0 0 1.05rem;padding-left:1.25rem}
+li{margin:.3rem 0}
+
+code{font:13px/1.5 var(--mono);background:#131a22;border:1px solid var(--border);
+  border-radius:4px;padding:.1rem .35rem;color:#d7e3ee}
+pre{background:#131a22;border:1px solid var(--border);border-radius:8px;
+  padding:.9rem 1rem;overflow-x:auto;margin:0 0 1.2rem}
+pre code{background:none;border:0;padding:0;font-size:12.5px;line-height:1.6}
+
+blockquote{margin:0 0 1.2rem;padding:.1rem 0 .1rem 1rem;
+  border-left:3px solid var(--border);color:var(--dim)}
+
+figure{margin:0 0 1.4rem}
+figure img{width:100%;display:block;border:1px solid var(--border);border-radius:8px}
+figcaption{color:var(--dim);font-size:.85rem;margin-top:.5rem}
+.shot{
+  border:1px dashed var(--border);border-radius:8px;background:var(--panel);
+  color:var(--dim);font:13px/1.5 var(--mono);text-align:center;padding:2.6rem 1rem
+}
+
+.note{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--accent);
+  border-radius:6px;padding:.85rem 1rem;margin:0 0 1.3rem}
+.note p{margin:0}
+.note.warn{border-left-color:var(--warn)}
+
+.posts{list-style:none;padding:0;margin:0}
+.posts li{border-top:1px solid var(--border);padding:1.1rem 0;margin:0}
+.posts li:last-child{border-bottom:1px solid var(--border)}
+.posts a{font-size:1.05rem;font-weight:600}
+.posts p{margin:.3rem 0 0;color:var(--dim);font-size:.93rem}
+.soon{color:var(--dim);font-size:1.05rem;font-weight:600}
+.tag{font:11px/1 var(--mono);color:var(--ok);border:1px solid var(--border);
+  border-radius:999px;padding:.25rem .5rem;margin-left:.5rem;vertical-align:.1em}
+.tag.later{color:var(--dim)}
+
+footer.site{border-top:1px solid var(--border);margin-top:4rem;padding:1.6rem 0 3rem;
+  color:var(--dim);font-size:.88rem}
+footer.site p{margin:0 0 .4rem}
+
+@media(max-width:34rem){h1{font-size:1.6rem}.wrap{padding:0 1rem}}

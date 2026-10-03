@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="gd77-mods: a handheld radio screen showing a two-line channel name above a signal meter">
+  <rect x="20" y="1" width="3" height="8" rx="1.5" fill="#4fb3ff"/>
+  <rect x="13" y="7" width="38" height="56" rx="6" fill="#171e26" stroke="#2a3743" stroke-width="2"/>
+  <rect x="18" y="13" width="28" height="22" rx="2.5" fill="#0f1419" stroke="#2a3743" stroke-width="1.5"/>
+  <rect x="21" y="17" width="22" height="5" rx="1.5" fill="#4fb3ff"/>
+  <rect x="21" y="25" width="15" height="5" rx="1.5" fill="#4fb3ff" opacity="0.7"/>
+  <g>
+    <rect x="18" y="41" width="4" height="4" rx="1" fill="#4fd18b"/>
+    <rect x="24" y="39" width="4" height="6" rx="1" fill="#4fd18b"/>
+    <rect x="30" y="37" width="4" height="8" rx="1" fill="#4fd18b"/>
+    <rect x="36" y="39" width="4" height="6" rx="1" fill="#2a3743"/>
+    <rect x="42" y="41" width="4" height="4" rx="1" fill="#2a3743"/>
+  </g>
+  <g fill="#2a3743">
+    <rect x="19" y="50" width="7" height="3" rx="1.5"/>
+    <rect x="28.5" y="50" width="7" height="3" rx="1.5"/>
+    <rect x="38" y="50" width="7" height="3" rx="1.5"/>
+    <rect x="19" y="56" width="7" height="3" rx="1.5"/>
+    <rect x="28.5" y="56" width="7" height="3" rx="1.5"/>
+    <rect x="38" y="56" width="7" height="3" rx="1.5"/>
+  </g>
+</svg>

@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>gd77-mods — OpenGD77 mods to make radios more fun</title>
+<meta name="description" content="Eric Muehlstein (KC9MHE / WRXC682) on the OpenGD77 display mods he builds so friends and family can run capable radios without a cluttered, overwhelming screen.">
+<link rel="canonical" href="https://gd77-mods.chicagooffline.com/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="gd77-mods — OpenGD77 mods to make radios more fun">
+<meta property="og:description" content="Firmware display mods that keep a capable DMR handheld fun and readable instead of overwhelming.">
+<meta property="og:url" content="https://gd77-mods.chicagooffline.com/">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <img src="logo.svg" alt="">
+    <a class="home" href="/">gd77-mods</a>
+    <span class="calls">KC9MHE &middot; WRXC682</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h1>OpenGD77 mods to make radios more fun</h1>
+
+  <p class="lede">
+    I've been trying to find the best radios to use with my friends and family. I
+    want them to have capable radios without being overwhelmed with the complexity
+    of the interface.
+  </p>
+
+  <p>
+    A good handheld shows you a dozen things at once &mdash; mode, power, color
+    code, timeslot, filter, squelch. If you already know what those mean, that
+    density is useful. If you got the radio last week, it's noise sitting on
+    top of the one thing you actually need: <strong>which channel am I on.</strong>
+  </p>
+
+  <p>
+    That's a large part of why I standardize on
+    <a href="https://opengd77.com/" target="_blank" rel="noopener">OpenGD77</a>
+    to begin with. It replaces the vendor firmware on a whole range of
+    handhelds, so radios from different manufacturers end up running the same
+    menus and the same interface. When a friend calls and asks how to do
+    something, I've got a rough idea of where it lives without having to remember
+    each vendor's particular take on a menu tree. That uniformity is OpenGD77's
+    doing &mdash; it's the reason to run it, and it has nothing to do with my
+    patches.
+  </p>
+
+  <p>
+    What I add on top is much narrower. OpenGD77's display is still laid out for
+    operators who already know what they are looking at, so my mods put the
+    channel name front and center and move the rest out of the way.
+  </p>
+
+  <p>
+    Everything here is a patch against stock OpenGD77 source, and every mod is a
+    setting you can switch off. Write-ups as I go.
+  </p>
+
+  <h2>Posts</h2>
+
+  <ul class="posts">
+    <li>
+      <span class="soon">The split-name mod</span><span class="tag later">soon</span>
+      <p>Putting a pipe in a channel name to get two big lines instead of one cramped one &mdash; and moving the transmit timer out of their way.</p>
+    </li>
+    <li>
+      <span class="soon">A quieter status bar</span><span class="tag later">soon</span>
+      <p>Replacing mode, power and color code with a signal meter and a battery gauge.</p>
+    </li>
+    <li>
+      <span class="soon">Building OpenGD77 on a Mac</span><span class="tag later">soon</span>
+      <p>The toolchain notes I wish I had found first.</p>
+    </li>
+  </ul>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>Eric Muehlstein &mdash; KC9MHE (amateur), WRXC682 (GMRS).</p>
+    <p>Written with AI assistance. The radios, the testing and any mistakes are mine.</p>
+    <p>Patches only &mdash; I do not distribute built firmware images.</p>
+  </div>
+</footer>
+
+</body>
+</html>
