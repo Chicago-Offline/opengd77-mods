@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The split-name mod — gd77-mods</title>
+<meta name="description" content="Putting a pipe character in an OpenGD77 channel name to get two large readable lines, and how it works in the source.">
+<link rel="canonical" href="https://gd77-mods.chicagooffline.com/posts/split-name.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The split-name mod">
+<meta property="og:description" content="Two big readable lines instead of one cramped channel name, and what it took in the OpenGD77 source.">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <img src="../logo.svg" alt="">
+    <a class="home" href="../">gd77-mods</a>
+    <span class="calls">KC9MHE &middot; WRXC682</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h1>The split-name mod</h1>
+  <p class="meta">OpenGD77 &middot; MD-UV380 / RT3S</p>
+
+  <p class="lede">
+    A channel name gets sixteen characters and one line. That is enough room to
+    be technically correct and still unreadable at arm's length.
+  </p>
+
+  <p>
+    I want a name that says both things a newcomer needs: what service this is,
+    and which channel it is. <code>GMRS 16 REPEATER</code> says it, but by the
+    time it fits on one line it is small enough that you have to stop and look.
+    What I actually wanted was two lines, both big.
+  </p>
+
+  <p>
+    So the mod is simple to use: put a <code>|</code> in the channel name when
+    you program the radio.
+  </p>
+
+  <pre><code>GMRS|16 RPT     &rarr;   GMRS
+                    16 RPT</code></pre>
+
+  <figure>
+    <div class="shot">screen capture &mdash; stock, one cramped line</div>
+    <figcaption>Before: the whole name on a single line.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="shot">screen capture &mdash; split name, two large lines</div>
+    <figcaption>After: split on the pipe, both lines in the wide font.</figcaption>
+  </figure>
+
+  <h2>What it actually does</h2>
+
+  <p>
+    Every piece of the channel screen &mdash; contact, channel name, TX timer,
+    zone &mdash; is drawn by one function:
+    <code>uiUtilityDisplayInformation()</code> in
+    <code>application/source/user_interface/uiUtilities.c</code>. The screen
+    code in <code>uiChannelMode.c</code> doesn't draw anything itself; it calls
+    that function with a tag saying what kind of line this is:
+  </p>
+
+  <pre><code>uiUtilityDisplayInformation(nameBuf, DISPLAY_INFO_CHANNEL, yOverride);</code></pre>
+
+  <p>
+    Inside, a <code>switch</code> on that tag picks the rendering rules, so the
+    whole mod lives under one case label:
+    <code>case DISPLAY_INFO_CHANNEL:</code>. That's the thing that made this
+    patch pleasant to write &mdash; one function, one case, no hunting across
+    files.
+  </p>
+
+  <p>
+    Before anything is rendered, it looks for a pipe:
+  </p>
+
+  <pre><code>const char *pipe = (str != NULL) ? strchr(str, '|') : NULL;</code></pre>
+
+  <p>
+    If there's one, the name is cut in two at that point and copied into a pair
+    of sixteen-character buffers. If not, the name is used as-is &mdash; the
+    stock path, untouched.
+  </p>
+
+  <h2>Only on analog channels</h2>
+
+  <p>
+    This gate wasn't in the first version:
+  </p>
+
+  <pre><code>if ((pipe != NULL) &amp;&amp; (trxGetMode() == RADIO_MODE_ANALOG))</code></pre>
+
+  <p>
+    I applied the split blindly at first &mdash; every channel, both modes. On
+    analog it was exactly what I wanted. On DMR it collided immediately: a
+    digital channel is already spending its screen on talkgroup and contact
+    lines, and a two-line name shoves all of that around.
+  </p>
+
+  <p>
+    I could have chased down every DMR layout interaction. Instead I asked what
+    was actually true: the mod was already fully useful on analog, and analog is
+    where my newcomer channels live anyway &mdash; MURS, GMRS, FRS, repeaters.
+    So it ships analog-only, and the DMR problems stay unsolved instead of
+    half-solved.
+  </p>
+
+  <p>
+    One detail so the same codeplug works everywhere: on a digital channel the
+    pipe isn't drawn literally &mdash; it's rendered as a space. You name the
+    channel once, and each mode does something sensible with it.
+  </p>
+
+  <h2>Picking the font, and the part I got wrong first</h2>
+
+  <p>
+    OpenGD77 has a genuinely wide font &mdash; 16 pixels across, 32 tall. It
+    looks great and it doesn't always fit. The screen is 160 pixels wide, so
+    that font gives you exactly ten characters per line:
+  </p>
+
+  <pre><code>wideName = (dblHeight &amp;&amp; settingsIsOptionBitSet(BIT_UI_WIDE_NAME) &amp;&amp;
+            (longest &lt;= (DISPLAY_SIZE_X / WIDE_CHAR_WIDTH)));</code></pre>
+
+  <p>
+    <code>longest</code> is whichever of the two lines is longer. If it fits,
+    both lines get the wide font. If it doesn't, the whole thing drops back to
+    the narrower font rather than rendering one line wide and one line small.
+  </p>
+
+  <div class="note">
+    <p>
+      The reason that test has to exist: the draw call silently truncates
+      anything too long. No error, no wrap &mdash; the end of your channel name
+      just is not there. That cost us a little time before we measured it.
+    </p>
+  </div>
+
+  <p>
+    My first version hard-coded the narrow font for names without a pipe, which
+    meant short single-line names could never get the big font even when they
+    obviously fit.
+  </p>
+
+  <h2>It's a setting, not a fork</h2>
+
+  <p>
+    This rides on the existing <strong>Text size</strong> option rather than
+    adding a new one:
+  </p>
+
+  <ul>
+    <li><strong>1</strong> &mdash; normal, stock behavior</li>
+    <li><strong>2</strong> &mdash; stock double-height</li>
+    <li><strong>3</strong> &mdash; the wide font, when the name fits</li>
+  </ul>
+
+  <p>
+    Anyone who doesn't want this leaves Text size at 1 and gets the stock radio
+    back. That matters to me: I'm handing these radios to people, and I don't
+    want the firmware to be a thing they're stuck with.
+  </p>
+
+  <h2>Centering two lines</h2>
+
+  <p>
+    The last piece is unglamorous arithmetic. The usable band between the header
+    and the zone footer is 94 pixels tall, so two lines plus a six pixel gap get
+    centered in it rather than pinned to a fixed row. That keeps the block
+    looking deliberate at every font size.
+  </p>
+
+  <h2>The transmit timer had to move too</h2>
+
+  <p>
+    This is the part I didn't see coming. Key up and a transmit timer appears
+    near the top of the screen &mdash; right where the channel name now lives.
+    Stock firmware gets away with this: it shuffles its single-line name down a
+    row to make room. But it knows nothing about my second line, so the timer
+    simply drew <em>on top of</em> the name &mdash; overlapping text, the one
+    thing you most want to read while transmitting.
+  </p>
+
+  <p>
+    So the timer is drawn on the zone footer row instead, which is otherwise
+    idle during transmit:
+  </p>
+
+  <pre><code>/* was DISPLAY_Y_POS_TX_TIMER, up near the channel name */
+int8_t yOverride = DISPLAY_Y_POS_ZONE;
+
+snprintf(buffer, SCREEN_LINE_BUFFER_SIZE, "%d", txTimeSecs);
+uiUtilityDisplayInformation(buffer, DISPLAY_INFO_TX_TIMER, yOverride);</code></pre>
+
+  <p>
+    With the timer gone from the top, the channel name no longer needs its
+    transmit special case at all &mdash; it simply keeps the centered position it
+    already had.
+  </p>
+
+  <p>
+    One exception. The DM1701 has a shorter screen and no spare footer row to
+    give away, so it keeps the stock arrangement and still shifts the name down
+    while transmitting. That's a compile-time guard rather than a setting.
+  </p>
+
+  <div class="note">
+    <p>
+      This is why the timer change belongs to the split-name patch instead of
+      being a mod of its own: without it, the two-line name doesn't survive a
+      transmit.
+    </p>
+  </div>
+
+  <figure>
+    <div class="shot">screen capture &mdash; transmitting, name centered, timer in the footer</div>
+    <figcaption>Keyed up: the name holds its position and the timer sits on the footer row.</figcaption>
+  </figure>
+
+  <div class="note warn">
+    <p>
+      Patches only. I don't hand out built firmware images &mdash; a large part
+      of any flashable image belongs to the radio vendor. You bring your own
+      OpenGD77 source and build it.
+    </p>
+  </div>
+
+  <p class="dim"><a href="../">&larr; back</a></p>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>Eric Muehlstein &mdash; KC9MHE (amateur), WRXC682 (GMRS).</p>
+    <p>Written with AI assistance. The radios, the testing and any mistakes are mine.</p>
+  </div>
+</footer>
+
+</body>
+</html>
