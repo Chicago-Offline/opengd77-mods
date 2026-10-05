@@ -34,7 +34,7 @@
 
   <p>
     I want a name that says both things a newcomer needs: what service this is,
-    and which channel it is. <code>GMRS 16 REPEATER</code> says it, but by the
+    and which channel it is. <code>GMRS 15 Repeater</code> says it, but by the
     time it fits on one line it is small enough that you have to stop and look.
     What I actually wanted was two lines, both big.
   </p>
@@ -44,16 +44,18 @@
     you program the radio.
   </p>
 
-  <pre><code>GMRS|16 RPT     &rarr;   GMRS
-                    16 RPT</code></pre>
+  <pre><code>GMRS 15|RPT     &rarr;   GMRS 15
+                    RPT</code></pre>
 
   <figure>
-    <div class="shot">screen capture &mdash; stock, one cramped line</div>
+    <img src="../img/before-one-line.png" width="160" height="128"
+         alt="RT3S channel screen on stock OpenGD77: the name GMRS 15 Repeater squeezed onto one line in a reduced font.">
     <figcaption>Before: the whole name on a single line.</figcaption>
   </figure>
 
   <figure>
-    <div class="shot">screen capture &mdash; split name, two large lines</div>
+    <img src="../img/after-split-name.png" width="160" height="128"
+         alt="RT3S channel screen on the patched build: the name split at the pipe into GMRS 15 over RPT, both lines in the full-width font.">
     <figcaption>After: split on the pipe, both lines in the wide font.</figcaption>
   </figure>
 
