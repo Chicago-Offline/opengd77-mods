@@ -40,8 +40,9 @@ blockquote{margin:0 0 1.2rem;padding:.1rem 0 .1rem 1rem;
   border-left:3px solid var(--border);color:var(--dim)}
 
 figure{margin:0 0 1.4rem}
-figure img{width:100%;display:block;border:1px solid var(--border);border-radius:8px;
-  image-rendering:pixelated;image-rendering:crisp-edges;background:#000}
+figure img{display:block;border:1px solid var(--border);border-radius:8px;
+  image-rendering:pixelated;image-rendering:crisp-edges;background:#000;
+  width:100%;max-width:320px}
 figcaption{color:var(--dim);font-size:.85rem;margin-top:.5rem}
 .shot{
   border:1px dashed var(--border);border-radius:8px;background:var(--panel);
