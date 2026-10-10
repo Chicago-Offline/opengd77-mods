@@ -228,6 +228,32 @@ uiUtilityDisplayInformation(buffer, DISPLAY_INFO_TX_TIMER, yOverride);</code></p
     <figcaption>Keyed up: the name holds its position and the timer sits on the footer row.</figcaption>
   </figure>
 
+  <h2>Get the patch</h2>
+
+  <p>
+    Here it is, if you want it:
+    <a href="../patches/chioff-split-name.patch">chioff-split-name.patch</a>.
+    It's a plain unified diff against the OpenGD77 <code>R20260131</code>
+    release source &mdash; four files, 126 lines added, nothing binary in it.
+    Everything on this page is in there, including the transmit-timer move.
+  </p>
+
+  <pre><code>git apply --3way chioff-split-name.patch</code></pre>
+
+  <p>
+    Run that from the root of your OpenGD77 checkout. If you're on a different
+    release the hunks may drift, but there are only four of them and they're all
+    in <code>uiUtilities.c</code>, <code>uiChannelMode.c</code>,
+    <code>menuDisplayOptions.c</code> and <code>settings.h</code>, so a
+    <code>--3way</code> merge usually sorts it out.
+  </p>
+
+  <p>
+    It only touches display code &mdash; nothing in the RF or codec paths, and no
+    vendor blobs ride along, so it drops onto a clean checkout without dragging
+    anything else with it.
+  </p>
+
   <div class="note warn">
     <p>
       Patches only. I don't hand out built firmware images &mdash; a large part

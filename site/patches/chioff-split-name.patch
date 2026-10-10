@@ -1,0 +1,221 @@
+diff --git a/MDUV380_firmware/application/include/functions/settings.h b/MDUV380_firmware/application/include/functions/settings.h
+index e1b5996..4f67cf0 100644
+--- a/MDUV380_firmware/application/include/functions/settings.h
++++ b/MDUV380_firmware/application/include/functions/settings.h
+@@ -168,6 +168,7 @@ typedef enum
+ #endif
+ 	BIT_CHANNELS_ARE_READ_ONLY      = (SETTINGS_BITS_BANK_0 | (1 << 27)),
+ 	BIT_UI_USES_DOUBLE_HEIGHT       = (SETTINGS_BITS_BANK_0 | (1 << 28)),
++	BIT_UI_WIDE_NAME                = (SETTINGS_BITS_BANK_0 | (1 << 29)), // chioff: Text size 3 (wide bigname font)
+ 
+ 	// Last usable bit is 29
+ 	//BIT_xxxxxxx_xxxxxxxxxxxx      = (SETTINGS_BITS_BANK_1 | (1 << 0)),
+diff --git a/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c b/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c
+index 27dd223..40d8ce0 100644
+--- a/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c
++++ b/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c
+@@ -184,7 +184,7 @@ static void updateScreen(bool isFirstRun)
+ #if defined(HAS_COLOURS)
+ 				case DISPLAY_TYPE_STYLE:
+ 					leftSide = currentLanguage->text_size;
+-					snprintf(rightSideVar, SCREEN_LINE_BUFFER_SIZE, "%d", settingsIsOptionBitSet(BIT_UI_USES_DOUBLE_HEIGHT) ? 2 : 1);
++					snprintf(rightSideVar, SCREEN_LINE_BUFFER_SIZE, "%d", settingsIsOptionBitSet(BIT_UI_USES_DOUBLE_HEIGHT) ? (settingsIsOptionBitSet(BIT_UI_WIDE_NAME) ? 3 : 2) : 1);
+ 					break;
+ #endif
+ 
+@@ -524,6 +524,10 @@ static void handleEvent(uiEvent_t *ev)
+ 					{
+ 						settingsSetOptionBit(BIT_UI_USES_DOUBLE_HEIGHT, true);
+ 					}
++					else if (settingsIsOptionBitSet(BIT_UI_WIDE_NAME) == false)
++					{
++						settingsSetOptionBit(BIT_UI_WIDE_NAME, true);
++					}
+ 					break;
+ #endif
+ 
+@@ -734,7 +738,11 @@ static void handleEvent(uiEvent_t *ev)
+ 			{
+ #if defined(HAS_COLOURS)
+ 				case DISPLAY_TYPE_STYLE:
+-					if (settingsIsOptionBitSet(BIT_UI_USES_DOUBLE_HEIGHT))
++					if (settingsIsOptionBitSet(BIT_UI_WIDE_NAME))
++					{
++						settingsSetOptionBit(BIT_UI_WIDE_NAME, false);
++					}
++					else if (settingsIsOptionBitSet(BIT_UI_USES_DOUBLE_HEIGHT))
+ 					{
+ 						settingsSetOptionBit(BIT_UI_USES_DOUBLE_HEIGHT, false);
+ 					}
+@@ -1110,6 +1118,7 @@ static void exitCallback(void *data)
+ #endif
+ #if defined(HAS_COLOURS)
+ 				BIT_UI_USES_DOUBLE_HEIGHT,
++				BIT_UI_WIDE_NAME,
+ #endif
+ 				BIT_AUTO_NIGHT,
+ 				BIT_DISPLAY_CHANNEL_DISTANCE,
+diff --git a/MDUV380_firmware/application/source/user_interface/uiChannelMode.c b/MDUV380_firmware/application/source/user_interface/uiChannelMode.c
+index a321575..3eef53d 100644
+--- a/MDUV380_firmware/application/source/user_interface/uiChannelMode.c
++++ b/MDUV380_firmware/application/source/user_interface/uiChannelMode.c
+@@ -848,10 +848,12 @@ void uiChannelModeUpdateScreen(int txTimeSecs)
+ 						// and Channel name slightly higher when double height font is enabled.
+ 						(DISPLAY_Y_POS_TX_TIMER - (dblHeight ? 4 : 0));
+ #else
+-						-1;
++						/* Move the TX timer to the footer so the channel name can
++						 * occupy its normal centre position during TX. */
++						DISPLAY_Y_POS_ZONE;
+ #endif
+ 
+-				snprintf(buffer, SCREEN_LINE_BUFFER_SIZE, " %d ", txTimeSecs);
++				snprintf(buffer, SCREEN_LINE_BUFFER_SIZE, "%d", txTimeSecs);
+ 				uiUtilityDisplayInformation(buffer, DISPLAY_INFO_TX_TIMER, yOverride);
+ 			}
+ 			else
+@@ -932,14 +934,14 @@ void uiChannelModeUpdateScreen(int txTimeSecs)
+ 
+ 			if (!uiDataGlobal.displayChannelSettings)
+ 			{
+-				int8_t yOverride = (isTransmitting ?
+-						DISPLAY_Y_POS_CHANNEL_SECOND_LINE
++				int8_t yOverride =
+ #if defined(PLATFORM_VARIANT_DM1701)
+-						// Because of the screen height reduction, we need to move Contact
+-						// and Channel name slightly higher when double height font is enabled.
+-						- (dblHeight ? 4 : 0)
++						/* DM1701: timer still occupies the timer zone, so push name down as before. */
++						(isTransmitting ? (DISPLAY_Y_POS_CHANNEL_SECOND_LINE - (dblHeight ? 4 : 0)) : -1);
++#else
++						/* TX timer is in the footer; name stays centred. */
++						-1;
+ #endif
+-						: -1);
+ 
+ #if defined(PLATFORM_MD9600)
+ 				if (codeplugChannelGetFlag(currentChannelData, CHANNEL_FLAG_OUT_OF_BAND) != 0)
+diff --git a/MDUV380_firmware/application/source/user_interface/uiUtilities.c b/MDUV380_firmware/application/source/user_interface/uiUtilities.c
+index 8bf3e5d..dc96cf5 100644
+--- a/MDUV380_firmware/application/source/user_interface/uiUtilities.c
++++ b/MDUV380_firmware/application/source/user_interface/uiUtilities.c
+@@ -1616,7 +1616,99 @@ void uiUtilityDisplayInformation(const char *str, displayInformation_t line, int
+ 				displayThemeApply(THEME_ITEM_FG_CHANNEL_NAME, THEME_ITEM_BG);
+ 			}
+ #endif
+-			displayPrintCoreDoubleHeight(0, ((yOverride == -1) ? DISPLAY_Y_POS_CHANNEL_FIRST_LINE : yOverride), str, FONT_SIZE_3, TEXT_ALIGN_CENTER, inverted, dblHeight);
++			/* chioff-bigname (dynamic sizing, tracks Text Size):
++			 *   Text Size 1 -> FONT_SIZE_3 (8x16)
++			 *   Text Size 2 -> FONT_SIZE_3 vertically doubled (stock dblHeight, 8x32)
++			 *   Text Size 3 -> FONT_SIZE_4 (16x32, genuinely wide) when every line fits,
++			 *                  otherwise degrades to the Text Size 2 rendering.
++			 * Applies to BOTH single-line names and '|'-split analog names. The previous
++			 * version hard-coded FONT_SIZE_3 in the no-pipe path, so short single-line
++			 * names ("IFERN", "IREACH", "ISPERN") could never reach the wide font.
++			 * displayPrintCore() silently truncates overlong strings, hence the fit test.
++			 */
++			{
++				const int16_t WIDE_CHAR_WIDTH = 16; /* font_16x32_compressed */
++				const char *pipe = (str != NULL) ? strchr(str, '|') : NULL;
++				char line1[17];
++				char line2[17];
++				bool twoLines = false;
++				int longest;
++				bool wideName;
++				ucFont_t nameFont;
++				bool nameDblHeight;
++				int16_t lineH;
++
++				line1[0] = '\0';
++				line2[0] = '\0';
++
++				if (str != NULL)
++				{
++					if ((pipe != NULL) && (trxGetMode() == RADIO_MODE_ANALOG))
++					{
++						int splitLen = (int)(pipe - str);
++
++						if (splitLen > 16)
++						{
++							splitLen = 16;
++						}
++						strncpy(line1, str, (size_t)splitLen);
++						line1[splitLen] = '\0';
++						strncpy(line2, pipe + 1, 16);
++						line2[16] = '\0';
++						twoLines = true;
++					}
++					else
++					{
++						/* Single line. A pipe may still be present on a digital channel;
++						 * render it as a space rather than a literal '|'. */
++						char *p2;
++
++						strncpy(line1, str, 16);
++						line1[16] = '\0';
++						p2 = strchr(line1, '|');
++						if (p2 != NULL)
++						{
++							*p2 = ' ';
++						}
++					}
++				}
++
++				/* The longest rendered line decides whether the wide font fits */
++				longest = (int)strlen(line1);
++				if (twoLines && ((int)strlen(line2) > longest))
++				{
++					longest = (int)strlen(line2);
++				}
++
++				wideName = (dblHeight && settingsIsOptionBitSet(BIT_UI_WIDE_NAME) &&
++						(longest <= (DISPLAY_SIZE_X / WIDE_CHAR_WIDTH)));
++				nameFont = (wideName ? FONT_SIZE_4 : FONT_SIZE_3);
++				nameDblHeight = (wideName ? false : dblHeight);
++				lineH = (int16_t)(dblHeight ? FONT_SIZE_4_HEIGHT : FONT_SIZE_3_HEIGHT);
++
++				if (twoLines)
++				{
++#if defined(PLATFORM_MDUV380) || defined(PLATFORM_MD380) || defined(PLATFORM_RT84_DM1701) || defined(PLATFORM_MD2017)
++					/* Screen 160x128. Header ~16px, zone footer at y=114, so the usable
++					 * band is y=16..110 = 94px. Centre two lines plus a 6px gap in it. */
++					const int16_t gap = 6;
++					const int16_t offset = (int16_t)((94 - ((2 * lineH) + gap)) / 2);
++					const int16_t y1 = (int16_t)(16 + offset);
++					const int16_t y2 = (int16_t)(y1 + lineH + gap);
++#else
++					const int16_t y1 = (int16_t)DISPLAY_Y_POS_CHANNEL_FIRST_LINE;
++					const int16_t y2 = (int16_t)(DISPLAY_Y_POS_CHANNEL_FIRST_LINE + lineH + 2);
++#endif
++					displayPrintCoreDoubleHeight(0, y1, line1, nameFont, TEXT_ALIGN_CENTER, inverted, nameDblHeight);
++					displayPrintCoreDoubleHeight(0, y2, line2, nameFont, TEXT_ALIGN_CENTER, inverted, nameDblHeight);
++				}
++				else
++				{
++					/* Single line keeps the stock Y. A wide FONT_SIZE_4 line is 32px tall,
++					 * the same footprint as stock Text Size 2, so nothing else moves. */
++					displayPrintCoreDoubleHeight(0, ((yOverride == -1) ? DISPLAY_Y_POS_CHANNEL_FIRST_LINE : yOverride), line1, nameFont, TEXT_ALIGN_CENTER, inverted, nameDblHeight);
++				}
++			}
+ 			break;
+ 
+ 		case DISPLAY_INFO_CHANNEL_DETAILS:
+@@ -1688,7 +1780,17 @@ void uiUtilityDisplayInformation(const char *str, displayInformation_t line, int
+ 
+ 		case DISPLAY_INFO_TX_TIMER:
+ 			displayThemeApply(THEME_ITEM_FG_TX_COUNTER, THEME_ITEM_BG);
+-			displayPrintCentered(((yOverride == -1) ? DISPLAY_Y_POS_TX_TIMER : yOverride), str, FONT_SIZE_4);
++			/* When the timer is rendered on the zone footer row
++			 * (yOverride == DISPLAY_Y_POS_ZONE) use FONT_SIZE_1 so it fits
++			 * the 8px footer band without overwriting the channel name. */
++			if ((yOverride != -1) && (yOverride >= DISPLAY_Y_POS_ZONE))
++			{
++				displayPrintCentered(yOverride, str, FONT_SIZE_1);
++			}
++			else
++			{
++				displayPrintCentered(((yOverride == -1) ? DISPLAY_Y_POS_TX_TIMER : yOverride), str, FONT_SIZE_4);
++			}
+ 			break;
+ 
+ 		case DISPLAY_INFO_ZONE:
