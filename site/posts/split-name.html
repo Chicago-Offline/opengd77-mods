@@ -254,11 +254,53 @@ uiUtilityDisplayInformation(buffer, DISPLAY_INFO_TX_TIMER, yOverride);</code></p
     anything else with it.
   </p>
 
+  <h2>Or just flash the build</h2>
+
+  <p>
+    If you'd rather not set up a toolchain, here's the firmware:
+    <a href="../firmware/chioff-splitname-R20260131.bin">chioff-splitname-R20260131.bin</a>
+    &mdash; OpenGD77 <code>R20260131</code> with this patch and nothing else on top
+    of it. 806,800 bytes, for MD-UV380 / RT3S.
+  </p>
+
+  <pre><code>sha256  d97395b8ac6ce3e538b4fdabafa980bc6463d9a0b17368b7affc135b820d0472
+md5     8a1bc79039bdc131f58bf69586801bda</code></pre>
+
+  <p>
+    Flash it the usual way &mdash; <a href="https://grid.radio/opengd77">grid.radio/opengd77</a>,
+    Custom File tab, pick the <code>.bin</code>, and leave the codec donor set to
+    <em>Built-in</em>. That last part matters, and here's why.
+  </p>
+
+  <h2>Why there's no vocoder in it</h2>
+
+  <p>
+    The AMBE vocoder isn't in this image, and it never was. The OpenGD77 sources
+    don't contain it &mdash; the build leaves that whole region of flash as
+    <code>0xFF</code>, and you can check mine: the three kilobytes around the
+    vocoder entry points are empty, every byte. The vocoder gets merged in at
+    flash time, out of a donor image your flashing tool already has. So what
+    you're downloading from me is OpenGD77 code and blank space, and the
+    proprietary part only ever lands on your radio, from your tool.
+  </p>
+
+  <div class="note">
+    <p>
+      OpenGD77 is BSD-3-Clause with a non-commercial clause, which permits handing
+      out binaries so long as the licence rides along with them. It does &mdash;
+      <a href="../firmware/LICENSE-OpenGD77.txt">LICENSE-OpenGD77.txt</a>, next to
+      the download. This site sells nothing and never will. The OpenGD77 developers
+      wrote the firmware; they didn't endorse this build and aren't responsible for it.
+    </p>
+  </div>
+
   <div class="note warn">
     <p>
-      Patches only. I don't hand out built firmware images &mdash; a large part
-      of any flashable image belongs to the radio vendor. You bring your own
-      OpenGD77 source and build it.
+      I build and flash these for my own radios, but this particular image is a
+      fresh rebuild and hasn't been on a radio yet. The patch itself has. If
+      that bothers you &mdash; and it reasonably might &mdash; apply the patch
+      above to your own checkout instead. Either way, know how to recover your
+      radio over USB before you write anything to it.
     </p>
   </div>
 
