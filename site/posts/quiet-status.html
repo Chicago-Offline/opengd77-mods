@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The quieter status bar &mdash; gd77-mods</title>
+<meta name="description" content="Replacing the crowded OpenGD77 header with an S-meter and a battery, and colour-coding what the radio is actually hearing.">
+<link rel="canonical" href="https://gd77-mods.chicagooffline.com/posts/quiet-status.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The quieter status bar">
+<meta property="og:description" content="An S-meter and a battery, instead of six things competing for one row of pixels.">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <img src="../logo.svg" alt="">
+    <a class="home" href="../">gd77-mods</a>
+    <span class="calls">KC9MHE &middot; WRXC682</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h1>The quieter status bar</h1>
+  <p class="meta">OpenGD77 &middot; MD-UV380 / RT3S</p>
+
+  <p class="lede">
+    The stock header puts six things in one row of eight pixels. I kept two of
+    them and gave the rest of the space to a meter.
+  </p>
+
+  <p>
+    Count what the top of the screen is carrying: the mode (FM, FMN or DMR),
+    the CTCSS or DCS tone, the transmit power, the timeslot, the colour code,
+    and the battery. Six pieces of information, one eight-pixel strip, all of
+    it set in the smallest font the radio owns.
+  </p>
+
+  <p>
+    Every one of those is worth knowing. Almost none of it is worth knowing
+    <em>right now</em>, mid-conversation, at arm's length. When I glance at a
+    handheld I'm asking two questions &mdash; am I hearing this person well,
+    and is the battery going to last &mdash; and the stock header answers
+    neither of them quickly, because the answers are the same size as
+    everything else.
+  </p>
+
+  <h2>What it looks like instead</h2>
+
+  <p>
+    The mod reduces the header to two rows:
+  </p>
+
+  <pre><code>[S-meter reading]                      [battery]
+[===== S-meter bar with S-unit marks =====]</code></pre>
+
+  <p>
+    Signal on the left, battery on the right, and underneath them a segmented
+    bar that uses the width the other five items were fighting over. The bar is
+    six pixels tall rather than the stock four, with the segments stepping up in
+    height from left to right &mdash; a weak signal is short as well as narrow,
+    so you can read it from the shape without reading the number.
+  </p>
+
+  <p>
+    Transmit folds into the same space. The reading on the left becomes your
+    power level, and the bar carries on as the stock mic-level meter. If you'd
+    rather watch power than your own voice, there's a setting for that too, and
+    the bar becomes a power bar while you're keyed up.
+  </p>
+
+  <h2>The glyph on the far left</h2>
+
+  <p>
+    There's a small status glyph at the left end of the meter, and it's colour
+    coded: cyan for an analog carrier, amber when a CTCSS or DCS tone is
+    decoding, green for DMR, red while transmitting. That's the mode indicator
+    the header used to spell out, except now it's a colour you catch in
+    peripheral vision instead of three letters you have to focus on.
+  </p>
+
+  <p>
+    Those colours are hardcoded, which deserves an explanation, because
+    hardcoding colour in a themeable UI is normally the wrong answer.
+  </p>
+
+  <p>
+    The honest reason is that deferring to the theme doesn't work here. In
+    <code>themeInitToDefaultValues()</code>, the stock theme assigns the
+    <em>same</em> foreground colour to <code>FG_RSSI_BAR</code>,
+    <code>FG_RSSI_BAR_S9P</code>, <code>FG_CHANNEL_CONTACT</code>,
+    <code>FG_CSS_SQL_VALUES</code> and <code>FG_TX_FREQ</code>. Drive the glyph
+    from theme items and all four states come out identical on a stock radio
+    &mdash; a colour code that codes nothing. Same problem for the S9+ segments:
+    they're the only scale reference left once the graduations are off, and
+    they're the same colour as the rest of the bar, so the boundary would be
+    invisible. So the glyph palette and the S9+ marker are fixed, and the body
+    of the bar still follows your theme. If you'd rather have the theme back,
+    one <code>#define</code> hands it over.
+  </p>
+
+  <h2>It's a setting</h2>
+
+  <p>
+    This started as compile-time defines, which is fine when you're the only
+    person building it and useless to anybody else. It's a menu item now:
+    <strong>Status hdr</strong>, in display options, with three values.
+  </p>
+
+  <pre><code>1   stock header
+2   S-meter and battery
+3   S-meter and battery, power bar on transmit</code></pre>
+
+  <p>
+    It ships on 1. A radio you flash and don't touch looks exactly like a stock
+    one, and nothing about this is load-bearing &mdash; if you don't like it,
+    put it back to 1 and the old header returns.
+  </p>
+
+  <p>
+    The two bits behind it were spare. OpenGD77 carries a block of unused option
+    bits in non-volatile settings; this takes two of them, so the setting
+    survives a power cycle without growing the settings structure or disturbing
+    anything already stored in it.
+  </p>
+
+  <h2>Get the patch</h2>
+
+  <p>
+    <a href="../patches/chioff-quiet-status.patch">chioff-quiet-status.patch</a>
+    &mdash; a plain unified diff against the OpenGD77 <code>R20260131</code>
+    release source. Three files, nothing binary in it.
+  </p>
+
+  <pre><code>git apply --3way chioff-quiet-status.patch</code></pre>
+
+  <p>
+    Run it from the root of your OpenGD77 checkout. It touches
+    <code>uiUtilities.c</code>, <code>menuDisplayOptions.c</code> and
+    <code>settings.h</code>, and nothing outside the display path.
+  </p>
+
+  <h2>Or just flash the build</h2>
+
+  <p>
+    <a href="../firmware/chioff-quiet-status-R20260131.bin">chioff-quiet-status-R20260131.bin</a>
+    &mdash; OpenGD77 <code>R20260131</code> with this patch and nothing else.
+    806,800 bytes, for MD-UV380 / RT3S.
+  </p>
+
+  <pre><code>sha256  b06cdc6bb96760cef6234e4f1952a74ceee1558d9d54f7a09280edd835e23714
+md5     9f12204686ff8765aa2059db109d244a</code></pre>
+
+  <p>
+    Flash it with <a href="https://grid.radio/opengd77">grid.radio/opengd77</a>
+    &mdash; Custom File tab, pick the <code>.bin</code>, leave the codec donor
+    on <em>Built-in</em>. There's no AMBE vocoder in this image; the OpenGD77
+    sources don't contain one, so that region of flash is left empty and your
+    flashing tool merges a vocoder in from its own donor at write time.
+  </p>
+
+  <div class="note">
+    <p>
+      OpenGD77 is BSD-3-Clause with a non-commercial clause, which permits
+      handing out binaries so long as the licence rides along with them. It does
+      &mdash; <a href="../firmware/LICENSE-OpenGD77.txt">LICENSE-OpenGD77.txt</a>,
+      next to the download. This site sells nothing and never will. The OpenGD77
+      developers wrote the firmware; they didn't endorse this build and aren't
+      responsible for it.
+    </p>
+  </div>
+
+  <div class="note warn">
+    <p>
+      This image is a fresh build and hasn't been on a radio yet. If that
+      bothers you &mdash; and it reasonably might &mdash; apply the patch to
+      your own checkout instead. Either way, know how to recover your radio over
+      USB before you write anything to it.
+    </p>
+  </div>
+
+  <p>
+    Want this and the <a href="split-name.html">split-name mod</a> at once?
+    That's the <a href="chicago-mod.html">Chicago mod</a>.
+  </p>
+
+  <p class="dim"><a href="../">&larr; back</a></p>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>Eric Muehlstein &mdash; KC9MHE (amateur), WRXC682 (GMRS).</p>
+    <p>Written with AI assistance. The radios, the testing and any mistakes are mine.</p>
+  </div>
+</footer>
+
+</body>
+</html>

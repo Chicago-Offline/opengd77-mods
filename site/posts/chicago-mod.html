@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Chicago mod &mdash; gd77-mods</title>
+<meta name="description" content="Both OpenGD77 mods in one build: two-line channel names and an S-meter status header, each with its own setting.">
+<link rel="canonical" href="https://gd77-mods.chicagooffline.com/posts/chicago-mod.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The Chicago mod">
+<meta property="og:description" content="Both mods in one build: readable channel names and a status bar that shows signal and battery.">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <img src="../logo.svg" alt="">
+    <a class="home" href="../">gd77-mods</a>
+    <span class="calls">KC9MHE &middot; WRXC682</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h1>The Chicago mod</h1>
+  <p class="meta">OpenGD77 &middot; MD-UV380 / RT3S</p>
+
+  <p class="lede">
+    Both mods in one build. This is what's actually on my radios.
+  </p>
+
+  <p>
+    The two mods on this site started as separate itches and ended up solving
+    the same problem from opposite ends of the screen. The
+    <a href="split-name.html">split-name mod</a> makes the channel name big
+    enough to read at arm's length. The
+    <a href="quiet-status.html">quieter status bar</a> clears the header down
+    to signal and battery. Run them together and the display stops being a
+    dense block of small text and becomes two things you can read without
+    stopping.
+  </p>
+
+  <p>
+    They're genuinely independent &mdash; different files, different settings,
+    no shared state &mdash; so you can take either one on its own from its own
+    page. This build is just the convenience of not applying two patches.
+  </p>
+
+  <h2>What you get</h2>
+
+  <p>
+    Both features, both off by default, each behind its own menu item in
+    display options:
+  </p>
+
+  <pre><code>Text size     1  stock
+              2  two-line split name
+              3  two-line split name, wide font
+
+Status hdr    1  stock header
+              2  S-meter and battery
+              3  S-meter and battery, power bar on transmit</code></pre>
+
+  <p>
+    A radio you flash and don't touch behaves like a stock one. Nothing turns
+    itself on, and either mod can go back to 1 independently of the other.
+  </p>
+
+  <p>
+    The write-ups for each live on their own pages &mdash; what the split
+    actually keys off, and why the status glyph colours are hardcoded instead
+    of themed. Worth reading before you flash, because both explain behaviour
+    that isn't obvious from the menu.
+  </p>
+
+  <h2>Get the patch</h2>
+
+  <p>
+    <a href="../patches/chioff-chicago-mod.patch">chioff-chicago-mod.patch</a>
+    &mdash; both mods as one unified diff against the OpenGD77
+    <code>R20260131</code> release source. Four files, nothing binary in it.
+  </p>
+
+  <pre><code>git apply --3way chioff-chicago-mod.patch</code></pre>
+
+  <p>
+    Run it from the root of your OpenGD77 checkout. It touches
+    <code>uiUtilities.c</code>, <code>uiChannelMode.c</code>,
+    <code>menuDisplayOptions.c</code> and <code>settings.h</code> &mdash;
+    display code only, nothing in the RF or codec paths.
+  </p>
+
+  <p>
+    If you'd rather have just one of them, the single-mod patches are on their
+    own pages. Don't apply those <em>and</em> this one; this patch already
+    contains both.
+  </p>
+
+  <h2>Or just flash the build</h2>
+
+  <p>
+    <a href="../firmware/chioff-chicago-mod-R20260131.bin">chioff-chicago-mod-R20260131.bin</a>
+    &mdash; OpenGD77 <code>R20260131</code> with both mods and nothing else.
+    806,800 bytes, for MD-UV380 / RT3S.
+  </p>
+
+  <pre><code>sha256  a65c28b176f5361947ce38445d0eb43a365f8f2325948cbfb8228b79476f1746
+md5     6f48ad0c48c643e8e05823f7caac503b</code></pre>
+
+  <p>
+    Flash it with <a href="https://grid.radio/opengd77">grid.radio/opengd77</a>
+    &mdash; Custom File tab, pick the <code>.bin</code>, leave the codec donor
+    on <em>Built-in</em>. There's no AMBE vocoder in this image; the OpenGD77
+    sources don't contain one, so that region of flash is left empty and your
+    flashing tool merges a vocoder in from its own donor at write time.
+  </p>
+
+  <div class="note">
+    <p>
+      OpenGD77 is BSD-3-Clause with a non-commercial clause, which permits
+      handing out binaries so long as the licence rides along with them. It does
+      &mdash; <a href="../firmware/LICENSE-OpenGD77.txt">LICENSE-OpenGD77.txt</a>,
+      next to the download. This site sells nothing and never will. The OpenGD77
+      developers wrote the firmware; they didn't endorse this build and aren't
+      responsible for it.
+    </p>
+  </div>
+
+  <div class="note warn">
+    <p>
+      This image is a fresh build and hasn't been on a radio yet. If that
+      bothers you &mdash; and it reasonably might &mdash; apply the patch to
+      your own checkout instead. Either way, know how to recover your radio over
+      USB before you write anything to it.
+    </p>
+  </div>
+
+  <p class="dim"><a href="../">&larr; back</a></p>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>Eric Muehlstein &mdash; KC9MHE (amateur), WRXC682 (GMRS).</p>
+    <p>Written with AI assistance. The radios, the testing and any mistakes are mine.</p>
+  </div>
+</footer>
+
+</body>
+</html>

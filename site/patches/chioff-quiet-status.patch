@@ -1,0 +1,506 @@
+diff --git a/MDUV380_firmware/application/include/functions/settings.h b/MDUV380_firmware/application/include/functions/settings.h
+index e1b5996..6295ab3 100644
+--- a/MDUV380_firmware/application/include/functions/settings.h
++++ b/MDUV380_firmware/application/include/functions/settings.h
+@@ -139,7 +139,7 @@ typedef enum
+ 	BIT_POWEROFF_SUSPEND            = (SETTINGS_BITS_BANK_0 | (1 << 8)),
+ #endif
+ 	BIT_SATELLITE_MANUAL_AUTO       = (SETTINGS_BITS_BANK_0 | (1 << 9)),
+-	BIT_UNUSED_1                    = (SETTINGS_BITS_BANK_0 | (1 << 10)),
++	BIT_SIMPLE_STATUS_HEADER        = (SETTINGS_BITS_BANK_0 | (1 << 10)), // chioff: S-meter + battery status header (was BIT_UNUSED_1)
+ #if defined(PLATFORM_MD9600)
+ 	BIT_SPEAKER_CLICK_SUPPRESS      = (SETTINGS_BITS_BANK_0 | (1 << 11)),
+ #endif
+@@ -153,7 +153,7 @@ typedef enum
+ 	BIT_VISUAL_VOLUME               = (SETTINGS_BITS_BANK_0 | (1 << 18)),
+ #endif
+ 	BIT_SECONDARY_LANGUAGE          = (SETTINGS_BITS_BANK_0 | (1 << 19)),
+-	BIT_UNUSED_3                    = (SETTINGS_BITS_BANK_0 | (1 << 20)),
++	BIT_SMETER_TX_SHOWS_POWER       = (SETTINGS_BITS_BANK_0 | (1 << 20)), // chioff: S-meter bar shows TX power while transmitting (was BIT_UNUSED_3)
+ 	BIT_DISPLAY_CHANNEL_DISTANCE    = (SETTINGS_BITS_BANK_0 | (1 << 21)),
+ #if defined(PLATFORM_MD2017)
+ 	BIT_TRACKBALL_ENABLED           = (SETTINGS_BITS_BANK_0 | (1 << 22)),
+diff --git a/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c b/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c
+index 27dd223..b4233f3 100644
+--- a/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c
++++ b/MDUV380_firmware/application/source/user_interface/menuDisplayOptions.c
+@@ -69,6 +69,7 @@ enum
+ {
+ #if defined(HAS_COLOURS)
+ 	DISPLAY_TYPE_STYLE,
++	DISPLAY_SIMPLE_STATUS_HEADER,
+ #endif
+ 	DISPLAY_MENU_BRIGHTNESS,
+ #if ! defined(PLATFORM_GD77S)
+@@ -186,6 +187,12 @@ static void updateScreen(bool isFirstRun)
+ 					leftSide = currentLanguage->text_size;
+ 					snprintf(rightSideVar, SCREEN_LINE_BUFFER_SIZE, "%d", settingsIsOptionBitSet(BIT_UI_USES_DOUBLE_HEIGHT) ? 2 : 1);
+ 					break;
++
++				case DISPLAY_SIMPLE_STATUS_HEADER:
++					// TODO: needs a currentLanguage->status_header string for i18n.
++					leftSide = "Status hdr";
++					snprintf(rightSideVar, SCREEN_LINE_BUFFER_SIZE, "%d", settingsIsOptionBitSet(BIT_SIMPLE_STATUS_HEADER) ? (settingsIsOptionBitSet(BIT_SMETER_TX_SHOWS_POWER) ? 3 : 2) : 1);
++					break;
+ #endif
+ 
+ 				case DISPLAY_MENU_BRIGHTNESS:
+@@ -525,6 +532,17 @@ static void handleEvent(uiEvent_t *ev)
+ 						settingsSetOptionBit(BIT_UI_USES_DOUBLE_HEIGHT, true);
+ 					}
+ 					break;
++
++				case DISPLAY_SIMPLE_STATUS_HEADER:
++					if (settingsIsOptionBitSet(BIT_SIMPLE_STATUS_HEADER) == false)
++					{
++						settingsSetOptionBit(BIT_SIMPLE_STATUS_HEADER, true);
++					}
++					else if (settingsIsOptionBitSet(BIT_SMETER_TX_SHOWS_POWER) == false)
++					{
++						settingsSetOptionBit(BIT_SMETER_TX_SHOWS_POWER, true);
++					}
++					break;
+ #endif
+ 
+ 				case DISPLAY_MENU_BRIGHTNESS:
+@@ -739,6 +757,17 @@ static void handleEvent(uiEvent_t *ev)
+ 						settingsSetOptionBit(BIT_UI_USES_DOUBLE_HEIGHT, false);
+ 					}
+ 					break;
++
++				case DISPLAY_SIMPLE_STATUS_HEADER:
++					if (settingsIsOptionBitSet(BIT_SMETER_TX_SHOWS_POWER))
++					{
++						settingsSetOptionBit(BIT_SMETER_TX_SHOWS_POWER, false);
++					}
++					else if (settingsIsOptionBitSet(BIT_SIMPLE_STATUS_HEADER))
++					{
++						settingsSetOptionBit(BIT_SIMPLE_STATUS_HEADER, false);
++					}
++					break;
+ #endif
+ 
+ 				case DISPLAY_MENU_BRIGHTNESS:
+@@ -1110,6 +1139,8 @@ static void exitCallback(void *data)
+ #endif
+ #if defined(HAS_COLOURS)
+ 				BIT_UI_USES_DOUBLE_HEIGHT,
++				BIT_SIMPLE_STATUS_HEADER,
++				BIT_SMETER_TX_SHOWS_POWER,
+ #endif
+ 				BIT_AUTO_NIGHT,
+ 				BIT_DISPLAY_CHANNEL_DISTANCE,
+diff --git a/MDUV380_firmware/application/source/user_interface/uiUtilities.c b/MDUV380_firmware/application/source/user_interface/uiUtilities.c
+index 8bf3e5d..646e272 100644
+--- a/MDUV380_firmware/application/source/user_interface/uiUtilities.c
++++ b/MDUV380_firmware/application/source/user_interface/uiUtilities.c
+@@ -1852,6 +1852,296 @@ void uiUtilityRenderQSOData(void)
+ 	displayThemeResetToDefault();
+ }
+ 
++// ---------------------------------------------------------------------------
++// Chicago Offline "simple header" mod.
++//
++// The stock header crams mode (FM/FMN/DMR), CTCSS/DCS, TX power, timeslot and
++// colour code plus the battery into a single 8 pixel row.  For a simple-UI
++// radio none of that is what an operator reads at a glance -- signal and
++// battery are.  This mod reduces the header to:
++//
++//     [S meter reading]                                      [battery]
++//     [====== S meter bar with S unit graduations ======]
++//
++// TX power is folded into the meter row: while transmitting, the left hand
++// text becomes the power level and the bar remains the stock mic level meter.
++//
++// Runtime controlled (2026-10-03).  Formerly the compile-time defines
++// CHIOFF_SIMPLE_HEADER / CHIOFF_TX_SHOWS_POWER; now settings bits so the user
++// can switch headers from the menu:
++//   BIT_SIMPLE_STATUS_HEADER   - use this header instead of the stock one
++//   BIT_SMETER_TX_SHOWS_POWER  - fold TX power into the meter row while keyed
++// Both are in settings.h and surfaced as "Status hdr" in menuDisplayOptions.c.
++// Both code paths always compile; the choice is made at runtime.
++// ---------------------------------------------------------------------------
++//
++// Retro segmented meter geometry.  The band is taller than the stock 4 pixel
++// bar, so chioffDrawProgressiveBar() clears it itself rather than relying on
++// drawHeaderBar().  It still fits inside the two header rows that
++// uiUtilityRedrawHeaderOnly() renders (displayRenderRows(0, 2) == y 0..15).
++//
++#define CHIOFF_SMETER_BAR_HEIGHT   6   // y DISPLAY_Y_POS_BAR .. +5
++#define CHIOFF_SMETER_SEG_PITCH    5   // segment + gap
++#define CHIOFF_SMETER_SEG_WIDTH    3   // lit part of a segment
++#define CHIOFF_SMETER_SEG_MIN_H    2   // height of the leftmost (weakest) segment
++#define CHIOFF_SMETER_ICON_W       5   // status glyph cell at the far left
++#define CHIOFF_SMETER_X0           7   // meter origin: glyph + 2 px gap
++
++// Status glyph colours.
++//
++// 🔴 The stock theme assigns the SAME foregroundColour to FG_RSSI_BAR,
++// FG_RSSI_BAR_S9P, FG_CHANNEL_CONTACT, FG_CSS_SQL_VALUES and FG_TX_FREQ -- see
++// themeInitToDefaultValues() in HX8353E_display.c.  Driving the glyph purely
++// from theme items would therefore render all four states IDENTICALLY on a
++// stock radio.  Hardcode the palette so the colour coding actually works.
++//
++// Comment out CHIOFF_ICON_HARD_COLOURS to defer to the user's theme instead.
++#if defined(HAS_COLOURS)
++#define CHIOFF_ICON_HARD_COLOURS
++#endif
++#define CHIOFF_ICON_RGB_RX    0x00E5FFU   // Signal Cyan  - analog carrier
++#define CHIOFF_ICON_RGB_CSS   0xFFB300U   // Beacon Amber - CTCSS/DCS
++#define CHIOFF_ICON_RGB_DMR   0x39FF14U   // Mesh Green   - DMR
++#define CHIOFF_ICON_RGB_TX    0xFF3B30U   // Red          - transmitting
++
++// The S9+ segments are the only remaining scale reference now that the
++// graduations are off by default -- and FG_RSSI_BAR_S9P is the SAME colour as
++// FG_RSSI_BAR in the stock theme, so the boundary would be invisible.  Hardcode
++// it.  The bar body itself still follows the user's theme.
++#define CHIOFF_SMETER_RGB_S9P 0xFFB300U   // Beacon Amber - above S9
++
++// S unit graduations. Off by default: unlit space is meant to stay empty, and
++// the S9+ colour change already marks the one boundary worth knowing.
++//#define CHIOFF_SMETER_TICKS
++
++#if defined(CHIOFF_SMETER_TICKS)
++//
++// Convert a dBm level into its x position on the header bar, using exactly the
++// same scaling as uiUtilityDrawRSSIBarGraph() so graduations line up with the
++// bar itself.  Only the graduations need this, so it follows them behind the
++// same switch.
++//
++static int chioffSMeterBarXPos(int rssiDBm)
++{
++	if ((rssiDBm > SMETER_S9) && (trxGetMode() == RADIO_MODE_ANALOG))
++	{
++		rssiDBm = ((rssiDBm - SMETER_S9) / STRONG_SIGNAL_RESCALE) + SMETER_S9;
++	}
++
++	int xPos = ((((rssiDBm - SMETER_S0) * 2) * rssiMeterHeaderBarNumUnits) / rssiMeterHeaderBarDivider);
++
++	return CLAMP(xPos, 0, (DISPLAY_SIZE_X - 1));
++}
++#endif // CHIOFF_SMETER_TICKS
++
++//
++// rssiMeterHeaderBar[] is scaled to the full display width, but the meter now
++// starts at CHIOFF_SMETER_X0 to leave room for the status glyph.  Every bar
++// width and graduation position has to be squeezed into what is left, or S9
++// lands in the wrong place.
++//
++static int chioffMapX(int xPos)
++{
++	return (CHIOFF_SMETER_X0 + ((xPos * (DISPLAY_SIZE_X - CHIOFF_SMETER_X0)) / DISPLAY_SIZE_X));
++}
++
++//
++// Status glyph at the far left of the meter row.  Colour carries the RX state,
++// so no text is needed:
++//   DMR              -> contact colour
++//   analog + CTCSS/DCS -> CSS colour
++//   analog carrier   -> normal bar colour
++//   transmitting     -> TX colour
++// Talkaround draws the glyph hollow; muted audio notches it.  Those two flags
++// used to ride on the header text, which is gone now.
++//
++static void chioffDrawStatusIcon(bool isTransmitting)
++{
++	const int16_t iconH = (CHIOFF_SMETER_BAR_HEIGHT - 1);
++	const int16_t iconY = (DISPLAY_Y_POS_BAR + 1);
++	themeItem_t iconItem;
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++	uint32_t iconRGB;
++	uint16_t savedFg;
++	uint16_t savedBg;
++#endif
++
++	if (isTransmitting)
++	{
++		iconItem = THEME_ITEM_FG_TX_FREQ;
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++		iconRGB = CHIOFF_ICON_RGB_TX;
++#endif
++	}
++	else if (trxGetMode() == RADIO_MODE_DIGITAL)
++	{
++		iconItem = THEME_ITEM_FG_CHANNEL_CONTACT;
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++		iconRGB = CHIOFF_ICON_RGB_DMR;
++#endif
++	}
++	else if (currentChannelData->rxTone != CODEPLUG_CSS_TONE_NONE)
++	{
++		iconItem = THEME_ITEM_FG_CSS_SQL_VALUES;
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++		iconRGB = CHIOFF_ICON_RGB_CSS;
++#endif
++	}
++	else
++	{
++		iconItem = THEME_ITEM_FG_RSSI_BAR;
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++		iconRGB = CHIOFF_ICON_RGB_RX;
++#endif
++	}
++
++	// Apply the theme first so the background matches the header, then override
++	// only the foreground with the hardcoded glyph colour.
++	displayThemeApply(iconItem, THEME_ITEM_BG_HEADER_TEXT);
++
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++	displayGetForegroundAndBackgroundColours(&savedFg, &savedBg);
++	displaySetForegroundAndBackgroundColours(
++			PLATFORM_COLOUR_FORMAT_SWAP_BYTES(RGB888_TO_PLATFORM_COLOUR_FORMAT(iconRGB)), savedBg);
++#endif
++
++	if (uiDataGlobal.talkaround)
++	{
++		displayDrawRect(0, iconY, CHIOFF_SMETER_ICON_W, iconH, false);
++	}
++	else
++	{
++		displayFillRect(0, iconY, CHIOFF_SMETER_ICON_W, iconH, false);
++	}
++
++	if (audioAmpIsMuted())
++	{
++		displayDrawFastHLine(0, (iconY + (iconH >> 1)), CHIOFF_SMETER_ICON_W, true);
++	}
++
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++	displaySetForegroundAndBackgroundColours(savedFg, savedBg);
++#endif
++
++	displayThemeResetToDefault();
++}
++
++//
++// Retro progressive bargraph: discrete segments that grow taller left to right,
++// so a strong signal is both longer and visually "bigger".  Unlit segments keep
++// a one pixel foot, which leaves a readable scale on a dead band.
++//
++// s9XPos < 0 disables the S9+ colour split (used by the TX power bar).
++//
++// Polarity reminder: displayFillRect()/displayDrawFastVLine() take isInverted,
++// where false == foreground (bar colour) and true == background.  Confirmed
++// against drawHeaderBar(), which fills with false and clears with true.
++//
++static void chioffDrawProgressiveBar(int barWidth, int s9XPos, themeItem_t fgItem)
++{
++	const int bandBottom = (DISPLAY_Y_POS_BAR + CHIOFF_SMETER_BAR_HEIGHT);
++	const int numSegments = ((DISPLAY_SIZE_X - CHIOFF_SMETER_X0) / CHIOFF_SMETER_SEG_PITCH);
++
++	barWidth = CLAMP(barWidth, 0, DISPLAY_SIZE_X);
++
++	displayThemeApply(fgItem, THEME_ITEM_BG_HEADER_TEXT);
++
++	// We own the whole band, including the glyph cell (drawHeaderBar only clears 4 rows).
++	displayFillRect(0, DISPLAY_Y_POS_BAR, DISPLAY_SIZE_X, CHIOFF_SMETER_BAR_HEIGHT, true);
++
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++	uint16_t baseFg;
++	uint16_t baseBg;
++	uint16_t s9pFg = PLATFORM_COLOUR_FORMAT_SWAP_BYTES(RGB888_TO_PLATFORM_COLOUR_FORMAT(CHIOFF_SMETER_RGB_S9P));
++
++	displayGetForegroundAndBackgroundColours(&baseFg, &baseBg);
++#endif
++
++	for (int i = 0; i < numSegments; i++)
++	{
++		int xPos = (CHIOFF_SMETER_X0 + (i * CHIOFF_SMETER_SEG_PITCH));
++		int segHeight = (CHIOFF_SMETER_SEG_MIN_H +
++				((i * (CHIOFF_SMETER_BAR_HEIGHT - CHIOFF_SMETER_SEG_MIN_H)) / (numSegments - 1)));
++
++		// Unlit segments draw nothing at all: empty space stays empty.
++		if ((xPos + CHIOFF_SMETER_SEG_WIDTH) > barWidth)
++		{
++			continue;
++		}
++
++		bool isAboveS9 = ((s9XPos >= 0) && (xPos >= s9XPos));
++
++		if (isAboveS9)
++		{
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++			displaySetForegroundAndBackgroundColours(s9pFg, baseBg);
++#else
++			displayThemeApply(THEME_ITEM_FG_RSSI_BAR_S9P, THEME_ITEM_BG_HEADER_TEXT);
++#endif
++		}
++
++		displayFillRect(xPos, (bandBottom - segHeight), CHIOFF_SMETER_SEG_WIDTH, segHeight, false);
++
++		if (isAboveS9)
++		{
++#if defined(CHIOFF_ICON_HARD_COLOURS)
++			displaySetForegroundAndBackgroundColours(baseFg, baseBg);
++#else
++			displayThemeApply(fgItem, THEME_ITEM_BG_HEADER_TEXT);
++#endif
++		}
++	}
++
++	displayThemeResetToDefault();
++}
++
++#if defined(CHIOFF_SMETER_TICKS)
++//
++// S unit graduations, drawn in the gaps between segments so they never fight
++// the bar itself.  Opt-in only: they put marks in space that is otherwise empty.
++//
++static void chioffDrawSMeterTicks(void)
++{
++	static const int tickLevels[] = { SMETER_S3, SMETER_S5, SMETER_S7, SMETER_S9, SMETER_S9_20, SMETER_S9_40 };
++	const int bandBottom = (DISPLAY_Y_POS_BAR + CHIOFF_SMETER_BAR_HEIGHT);
++
++	displayThemeApply(THEME_ITEM_FG_HEADER_TEXT, THEME_ITEM_BG_HEADER_TEXT);
++
++	for (uint8_t i = 0; i < (sizeof(tickLevels) / sizeof(tickLevels[0])); i++)
++	{
++		int xPos = chioffMapX(chioffSMeterBarXPos(tickLevels[i]));
++
++		// Snap into the gap that follows the segment this level falls in.
++		int gapX = ((((xPos - CHIOFF_SMETER_X0) / CHIOFF_SMETER_SEG_PITCH) * CHIOFF_SMETER_SEG_PITCH)
++				+ CHIOFF_SMETER_X0 + CHIOFF_SMETER_SEG_WIDTH);
++
++		if (gapX >= DISPLAY_SIZE_X)
++		{
++			continue;
++		}
++
++		// S9 is the strong signal boundary, give it the full band height.
++		int16_t tickHeight = ((tickLevels[i] == SMETER_S9) ? CHIOFF_SMETER_BAR_HEIGHT : 3);
++
++		displayDrawFastVLine(gapX, (bandBottom - tickHeight), tickHeight, false);
++	}
++
++	displayThemeResetToDefault();
++}
++#endif // CHIOFF_SMETER_TICKS
++
++//
++// TX: same retro bargraph, filled to the current power level instead of mic
++// level, in the TX colour so it is obviously not a signal reading.
++//
++static void chioffDrawPowerBar(uint8_t powerLevel)
++{
++	int barWidth = (((powerLevel + 1) * DISPLAY_SIZE_X) / (MAX_POWER_SETTING_NUM + 1));
++
++	chioffDrawProgressiveBar(chioffMapX(barWidth), -1, THEME_ITEM_FG_TX_FREQ);
++	chioffDrawStatusIcon(true);
++}
++
+ void uiUtilityRenderHeader(bool isVFODualWatchScanning, bool isVFOSweepScanning, bool forceBatteryDisplay)
+ {
+ 	const int MODE_TEXT_X_OFFSET = 1;
+@@ -1864,6 +2154,7 @@ void uiUtilityRenderHeader(bool isVFODualWatchScanning, bool isVFOSweepScanning,
+ 	const int POWER_X_CENTER = 65;//63;
+ 	const int COLOR_CODE_X_CENTER = 92;
+ #endif
++	const bool simpleHeader = settingsIsOptionBitSet(BIT_SIMPLE_STATUS_HEADER);
+ 	char buffer[SCREEN_LINE_BUFFER_SIZE];
+ 	static bool scanBlinkPhase = true;
+ 	static uint32_t blinkTime = 0;
+@@ -1926,7 +2217,11 @@ void uiUtilityRenderHeader(bool isVFODualWatchScanning, bool isVFOSweepScanning,
+ 		}
+ 		else
+ 		{
+-			if (radioMode == RADIO_MODE_DIGITAL)
++			if (simpleHeader && settingsIsOptionBitSet(BIT_SMETER_TX_SHOWS_POWER))
++			{
++				chioffDrawPowerBar(powerLevel);
++			}
++			else if (radioMode == RADIO_MODE_DIGITAL)
+ 			{
+ 				uiUtilityDrawDMRMicLevelBarGraph();
+ 			}
+@@ -1963,6 +2258,41 @@ void uiUtilityRenderHeader(bool isVFODualWatchScanning, bool isVFOSweepScanning,
+ 		displayPrintCore(MODE_TEXT_X_OFFSET, DISPLAY_Y_POS_HEADER, buffer, FONT_SIZE_1, TEXT_ALIGN_LEFT, false);
+ 	}
+ 
++	if (simpleHeader)
++	{
++	//
++	// Simple header, left hand text:
++	//   RX -> S meter reading ("S7", "S9+20")
++	//   TX -> power level, folded into the meter row ("5W")
++	//
++	if (isVFOSweepScanning == false)
++	{
++		bool isInverted = (scanIsActive ? scanBlinkPhase : false);
++
++		// No S reading is printed: the meter itself is the signal indication, and
++		// talkaround / muted now ride on the status glyph.  Only dual watch and
++		// TX power still need words.
++		buffer[0] = 0;
++
++		if (isVFODualWatchScanning)
++		{
++			strcpy(buffer, "[DW]");
++		}
++		else if (isTransmittingIgnoringAPRSBeaconing())
++		{
++			sprintf(buffer, "%s%s", getPowerLevel(powerLevel), getPowerLevelUnit(powerLevel));
++		}
++
++		modePixelLen = (strlen(buffer) * 6);
++
++		if (modePixelLen > 0)
++		{
++			displayPrintCore(MODE_TEXT_X_OFFSET, DISPLAY_Y_POS_HEADER, buffer, FONT_SIZE_1, TEXT_ALIGN_LEFT, isInverted);
++		}
++	}
++	}
++	else
++	{
+ 	switch(radioMode)
+ 	{
+ 		case RADIO_MODE_ANALOG:
+@@ -2096,6 +2426,7 @@ void uiUtilityRenderHeader(bool isVFODualWatchScanning, bool isVFOSweepScanning,
+ 			}
+ 			break;
+ 	}
++	}
+ 
+ 	// APRS flag
+ 	if ((isVFOSweepScanning == false) && (isVFODualWatchScanning == false)
+@@ -2128,6 +2459,8 @@ void uiUtilityRenderHeader(bool isVFODualWatchScanning, bool isVFOSweepScanning,
+ 		}
+ 	}
+ 
++	if (simpleHeader == false)
++	{
+ 	// Power
+ 	sprintf(buffer, "%s%s", getPowerLevel(powerLevel), getPowerLevelUnit(powerLevel));
+ 
+@@ -2159,6 +2492,7 @@ void uiUtilityRenderHeader(bool isVFODualWatchScanning, bool isVFOSweepScanning,
+ 
+ 		displayPrintCore(ccXPos, DISPLAY_Y_POS_HEADER, buffer, FONT_SIZE_1, TEXT_ALIGN_LEFT, isNotFilteringCC);
+ 	}
++	}
+ 
+ #if defined(HAS_COLOURS) || defined(PLATFORM_MD9600)
+ #if defined(ALTERNATES_TIME_AND_BATTERY_DISPLAY)
+@@ -2284,6 +2618,16 @@ void uiUtilityDrawRSSIBarGraph(void)
+ 
+ 	int barWidth = ((rssi * rssiMeterHeaderBarNumUnits) / rssiMeterHeaderBarDivider);
+ 
++	if (settingsIsOptionBitSet(BIT_SIMPLE_STATUS_HEADER))
++	{
++	chioffDrawProgressiveBar(chioffMapX(barWidth), chioffMapX(rssiMeterHeaderBar[9] * 2), THEME_ITEM_FG_RSSI_BAR);
++#if defined(CHIOFF_SMETER_TICKS)
++	chioffDrawSMeterTicks();
++#endif
++	chioffDrawStatusIcon(false);
++	}
++	else
++	{
+ 	drawHeaderBar(&barWidth, 4);
+ 
+ #if defined(HAS_COLOURS)
+@@ -2301,6 +2645,7 @@ void uiUtilityDrawRSSIBarGraph(void)
+ 		}
+ 	}
+ #endif
++	}
+ 
+ #if 0 // Commented for now, maybe an option later.
+ 	int currentMode = trxGetMode();
