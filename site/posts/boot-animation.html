@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The animated boot screen &mdash; gd77-mods</title>
+<meta name="description" content="A scrolling Chicago skyline on OpenGD77 boot, why the codeplug boot image cannot animate, and the 1-bit version that needs no firmware at all.">
+<link rel="canonical" href="https://gd77-mods.chicagooffline.com/posts/boot-animation.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The animated boot screen">
+<meta property="og:description" content="A scrolling Chicago skyline at power-on, and what the OpenGD77 source will and will not let you do with the boot screen.">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <img src="../logo.svg" alt="">
+    <a class="home" href="../">gd77-mods</a>
+    <span class="calls">KC9MHE &middot; WRXC682</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h1>The animated boot screen</h1>
+  <p class="meta">OpenGD77 &middot; MD-UV380 / RT3S / DM1701</p>
+
+  <div class="note warn">
+    <p>
+      <strong>Nothing on this page has been on a radio yet.</strong> The patch
+      applies cleanly to the stock release source and that is all I can honestly
+      claim for it so far. There is no firmware download here, because I have not
+      built one. Read the last section before you use any of this.
+    </p>
+  </div>
+
+  <p class="lede">
+    The boot screen is three seconds you will see a few thousand times. That
+    seems like a reasonable place to put a skyline.
+  </p>
+
+  <p>
+    I wanted a scrolling Chicago skyline at power-on. What I got first was an
+    education in what the boot screen actually is, because two things in the
+    source quietly rule out the obvious approach.
+  </p>
+
+  <h2>The codeplug boot image cannot animate</h2>
+
+  <p>
+    OpenGD77 already lets you put a picture on the boot screen through the
+    codeplug, which sounds like the easy route. It is not, because the splash
+    screen has no animation loop. <code>uiSplashScreen()</code> calls
+    <code>updateScreen()</code> exactly once, on <code>isFirstRun</code>, and
+    after that <code>handleEvent()</code> only ever redraws on an explicit
+    redraw event. There is no tick, no frame counter, nothing to hang motion on.
+    One frame, and then it waits to exit.
+  </p>
+
+  <p>
+    So any animation means changing firmware. That is worth knowing before you
+    spend an evening drawing frames.
+  </p>
+
+  <h2>And that image is 128&times;64 and one bit &mdash; even in colour</h2>
+
+  <p>
+    This one surprised me. The MD-UV380 has a 160&times;128 colour screen, but the
+    codeplug boot image is still the old monochrome GD77 format, blitted into the
+    middle of it by <code>displayConvertGD77ImageData()</code>:
+  </p>
+
+  <pre><code>const uint32_t startOffset = (32 * DISPLAY_SIZE_X) + (DISPLAY_SIZE_X - 128) / 2;</code></pre>
+
+  <p>
+    1024 bytes, 128 columns by 8 pages. It lands on rows 32 to 95 and columns 16
+    to 143, so roughly half the screen is dead border, and the whole thing is two
+    colours taken from the splash theme items. There is no way to use the rest of
+    the panel without touching firmware, because that offset is computed rather
+    than configured.
+  </p>
+
+  <div class="note">
+    <p>
+      The polarity is backwards from what you would guess. A <em>set</em> bit
+      paints the background:
+    </p>
+    <pre><code>screenBuf[...] = ((d &gt;&gt; r) &amp; 0x01) ? backgroundColour : foregroundColour;</code></pre>
+    <p>
+      Pack your image the intuitive way and you get a perfect negative.
+    </p>
+  </div>
+
+  <h2>The version that needs no firmware</h2>
+
+  <p>
+    Since that path is static and monochrome anyway, I drew for it directly
+    rather than down-converting something richer. Title on one line, skyline
+    underneath, windows punched out of the silhouette as holes &mdash; in one bit
+    there is no such thing as a lit window, only building and not-building.
+  </p>
+
+  <figure>
+    <img src="../img/boot-1bit.png" width="512" height="256" style="image-rendering:pixelated"
+         alt="A 128 by 64 one-bit boot image: the words CHICAGO OFFLINE above a city skyline silhouette with punched-out windows.">
+    <figcaption>The raw 128&times;64 asset, shown at 4&times;.</figcaption>
+  </figure>
+
+  <figure>
+    <img src="../img/boot-1bit-onradio.png" width="480" height="384" style="image-rendering:pixelated"
+         alt="The same image as the radio draws it: centred on a 160 by 128 screen with wide black borders above and below.">
+    <figcaption>As the radio actually draws it. Those borders are the letterboxing, not a crop.</figcaption>
+  </figure>
+
+  <p>
+    <code>CHICAGO OFFLINE</code> in the 8&times;16 font is 120 pixels of the 128
+    available. One more character and it clips, because the text routine
+    truncates at the edge rather than wrapping.
+  </p>
+
+  <p>
+    Here is the packed file if you want it on your own radio:
+    <a href="../assets/chicago-boot-128x64.bin">chicago-boot-128x64.bin</a>
+    &mdash; exactly 1024 bytes, correct polarity, upload it as the codeplug boot
+    image. No firmware involved.
+  </p>
+
+  <h2>The animated one</h2>
+
+  <figure>
+    <img src="../img/boot-skyline.gif" width="480" height="384" style="image-rendering:pixelated"
+         alt="Animated preview: a Chicago skyline scrolls right to left across the lower half of the screen, windows twinkling, with blinking red beacons on the Willis Tower antennas.">
+    <figcaption>Preview at 3&times;. 240 pixel strip, 6 pixels per frame, about 3.6 seconds per loop.</figcaption>
+  </figure>
+
+  <p>
+    Willis and Hancock are the two that survive this few pixels &mdash; stepped
+    with twin antennas, and tapered with twin antennas, are distinct enough to
+    read. Marina City is in there for rhythm, but at nine pixels wide nobody is
+    going to name it.
+  </p>
+
+  <h2>No new setting</h2>
+
+  <p>
+    My first draft added a menu toggle, which was wrong twice over.
+  </p>
+
+  <p>
+    There is already a boot screen control, and it lives in the codeplug:
+  </p>
+
+  <pre><code>const int CODEPLUG_ADDR_BOOT_INTRO_SCREEN = 0x7518;// 0x01 = Chars 0x00 = Picture</code></pre>
+
+  <p>
+    That is the CPS <strong>Intro Screen</strong> field. The firmware only ever
+    reads it &mdash; there is no writer anywhere in the tree &mdash; and its one
+    consumer is the <code>bootScreenType == 0</code> test in the splash screen.
+  </p>
+
+  <p>
+    The other reason is that settings bits are nearly gone. The last usable bit
+    is 29, and the mods on this site already claim three of the spares. Spending
+    the last free one on something you look at for three seconds is a bad trade.
+  </p>
+
+  <p>
+    So this mod adds no setting at all. It replaces exactly one upstream
+    dead-end: you chose <em>Picture</em>, but there is no picture stored, so
+    stock firmware falls back to printing the word <code>OpenGD77</code> and your
+    two boot lines. That specific case now gets the skyline instead:
+  </p>
+
+  <pre><code>bootAnimActive = ((bootScreenType == 0) &amp;&amp; (customDataHasImage == false));</code></pre>
+
+  <p>
+    Your own boot lines are kept and drawn above the animation. Choose
+    <em>Chars</em> in the CPS, or store a real picture, and none of this code
+    runs. The switch already existed; I just hung something on the empty branch.
+  </p>
+
+  <h2>How it draws</h2>
+
+  <p>
+    The skyline is a 240&times;56 bitmap stored column-major in 8-pixel pages
+    &mdash; the same layout the OpenGD77 fonts use, so indexing is a couple of
+    shifts and no division:
+  </p>
+
+  <pre><code>uint8_t d = chioffSkylineBitmap[(((y &gt;&gt; 3) * CHIOFF_SKYLINE_W) + sx)];
+buf[...] = (((d &gt;&gt; (y &amp; 0x07)) &amp; 0x01) ? fgColour : bgColour);</code></pre>
+
+  <p>
+    That is 1680 bytes of flash. The strip is tileable &mdash; the last column
+    joins back to the first &mdash; so scrolling is just a modulo on the offset
+    and there is no seam to hide.
+  </p>
+
+  <p>
+    Motion comes from the timer the splash screen already uses for its PIN
+    prompt:
+  </p>
+
+  <pre><code>(void)addTimerCallback(bootAnimTick, BOOT_ANIM_FRAME_MS, UI_SPLASH_SCREEN, false);</code></pre>
+
+  <p>
+    Each tick advances the offset, redraws the band and re-arms itself. The band
+    starts at row 64, which is deliberately a multiple of eight so only the
+    skyline rows get pushed to the panel:
+  </p>
+
+  <pre><code>displayRenderRows((BOOT_ANIM_BAND_TOP / 8), ((BOOT_ANIM_BAND_TOP + CHIOFF_SKYLINE_H) / 8));</code></pre>
+
+  <p>
+    The title text above the band is drawn once and never touched again. The
+    callback also bails out if the current menu is no longer the splash screen,
+    so it cannot keep firing into a screen that has moved on.
+  </p>
+
+  <h2>How long it runs</h2>
+
+  <p>
+    The animation has no duration of its own. The splash screen exits when the
+    boot melody finishes or when any key is pressed, so the melody is the budget.
+    A longer custom melody gives you a longer skyline, which means the length is
+    tunable from the codeplug even though the animation lives in firmware.
+  </p>
+
+  <div class="note">
+    <p>
+      A zero-length boot melody makes the splash screen call
+      <code>exitSplashScreen()</code> immediately and skip the whole thing. If
+      you have silenced your boot tone, you will never see this.
+    </p>
+  </div>
+
+  <h2>One thing that cost us an evening</h2>
+
+  <p>
+    To lay this out properly I wanted to render the real OpenGD77 fonts on a
+    desktop rather than guess at spacing, so I parsed the glyph tables straight
+    out of <code>HX8353E_charset.h</code>. The first render came out as clean,
+    well-formed, completely wrong letters &mdash; <code>W9CHI</code> drew as
+    <code>V8BGH</code>.
+  </p>
+
+  <p>
+    Every glyph row in that file carries a trailing comment like
+    <code>// [ 33] '!'</code>, and the number scraper was eating those ASCII
+    codes as pixel data. One spurious byte per row, so the table drifted further
+    out of alignment with every character. Strip C comments before parsing and
+    all five fonts land on their exact expected byte counts.
+  </p>
+
+  <h2>Get the patch</h2>
+
+  <p>
+    <a href="../patches/chioff-boot-animation.patch">chioff-boot-animation.patch</a>
+    &mdash; a plain unified diff against the OpenGD77 <code>R20260131</code>
+    release source. Two files, 260 lines added, three removed, nothing binary in
+    it. One of those files is the generated skyline header.
+  </p>
+
+  <pre><code>git apply --3way chioff-boot-animation.patch</code></pre>
+
+  <p>
+    It touches <code>uiSplashScreen.c</code> and adds
+    <code>chioffSkyline.h</code>. No settings, no menus, no language strings, and
+    nothing in the RF or codec paths.
+  </p>
+
+  <p>
+    Want a different skyline? <a href="../tools/gen_skyline.py">tools/gen_skyline.py</a>
+    generates the header from a table of buildings. Edit the table, re-run it,
+    rebuild.
+  </p>
+
+  <h2>What is not done</h2>
+
+  <p>
+    I have not built this and I have not flashed it. I could not get a radio
+    connected the evening I wrote it, and I would rather publish the patch with
+    that said plainly than sit on it or imply a test that did not happen.
+  </p>
+
+  <p>
+    What I can claim: the patch applies cleanly to a pristine
+    <code>R20260131</code> checkout, verified with <code>git apply --check</code>,
+    and every firmware function it calls was read out of the release source
+    rather than assumed. What I cannot claim: that it compiles, that the timing
+    looks good on a real panel, or that 90 ms a frame is the right speed. The
+    1-bit image above is the part that is genuinely ready to use today.
+  </p>
+
+  <p>
+    Firmware and screen captures will go here once a radio cooperates.
+  </p>
+
+  <p class="dim"><a href="../">&larr; back</a></p>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>Eric Muehlstein &mdash; KC9MHE (amateur), WRXC682 (GMRS).</p>
+    <p>Written with AI assistance. The radios, the testing and any mistakes are mine.</p>
+  </div>
+</footer>
+
+</body>
+</html>
