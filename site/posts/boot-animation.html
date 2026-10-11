@@ -29,10 +29,10 @@
 
   <div class="note warn">
     <p>
-      <strong>Nothing on this page has been on a radio yet.</strong> The patch
-      applies cleanly to the stock release source and that is all I can honestly
-      claim for it so far. There is no firmware download here, because I have not
-      built one. Read the last section before you use any of this.
+      <strong>This has never run on a radio.</strong> It compiles clean and the
+      patch applies to the stock release source, but nothing here has been
+      flashed or watched on a real panel. There is no firmware download yet.
+      Read the last section before you use any of this.
     </p>
   </div>
 
@@ -280,22 +280,43 @@ buf[...] = (((d &gt;&gt; (y &amp; 0x07)) &amp; 0x01) ? fgColour : bgColour);</co
   <h2>What is not done</h2>
 
   <p>
-    I have not built this and I have not flashed it. I could not get a radio
-    connected the evening I wrote it, and I would rather publish the patch with
-    that said plainly than sit on it or imply a test that did not happen.
+    It builds. STM32CubeIDE headless, GCC 14.3.1, zero errors, and the five
+    warnings are the pre-existing AMBE absolute-branch ones that have nothing to
+    do with this change.
   </p>
 
   <p>
-    What I can claim: the patch applies cleanly to a pristine
-    <code>R20260131</code> checkout, verified with <code>git apply --check</code>,
-    and every firmware function it calls was read out of the release source
-    rather than assumed. What I cannot claim: that it compiles, that the timing
-    looks good on a real panel, or that 90 ms a frame is the right speed. The
-    1-bit image above is the part that is genuinely ready to use today.
+    I checked that the code actually landed in the image rather than trusting the
+    exit code:
+  </p>
+
+  <pre><code>0803ad00   116 B  t  bootAnimDrawBand
+0803ae88    92 B  t  bootAnimTick
+08057de0  1680 B  r  chioffSkylineBitmap
+2001ed38     2 B  b  bootAnimOffset
+2001ed3a     1 B  b  bootAnimActive</code></pre>
+
+  <p>
+    1680 bytes is 240 columns by 7 pages, which is the strip cost predicted
+    exactly. The whole mod is about 1.9 KB of flash and three bytes of RAM.
   </p>
 
   <p>
-    Firmware and screen captures will go here once a radio cooperates.
+    What I still cannot claim: that it looks right. It has never been flashed, so
+    I do not know whether 90 ms a frame is too fast, whether 6 pixels a step
+    judders, or whether the skyline reads at all on a real transflective panel
+    rather than a monitor. Those are the first things I expect to want changed.
+  </p>
+
+  <p>
+    There is deliberately still no firmware download. The image I built also
+    carries the other mods from this site, so it is not a clean single-mod
+    binary, and I am not going to hand out untested firmware. Build it yourself
+    from the patch if you want it early.
+  </p>
+
+  <p>
+    Screen captures will go here once a radio cooperates.
   </p>
 
   <p class="dim"><a href="../">&larr; back</a></p>
