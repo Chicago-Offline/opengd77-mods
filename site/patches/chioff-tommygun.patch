@@ -147,10 +147,10 @@ index 0000000..7a649b8
 +	{ 72, -7, 0 },
 +};
 diff --git a/MDUV380_firmware/application/source/user_interface/uiPowerOff.c b/MDUV380_firmware/application/source/user_interface/uiPowerOff.c
-index a92203e..3dff548 100644
+index a92203e..b12fcb0 100644
 --- a/MDUV380_firmware/application/source/user_interface/uiPowerOff.c
 +++ b/MDUV380_firmware/application/source/user_interface/uiPowerOff.c
-@@ -28,16 +28,41 @@
+@@ -28,15 +28,44 @@
  #include "user_interface/uiGlobals.h"
  #include "user_interface/menuSystem.h"
  #include "user_interface/uiLocalisation.h"
@@ -164,8 +164,13 @@ index a92203e..3dff548 100644
 +static void updateScreen(uint8_t frame);
  static void handleEvent(uiEvent_t *ev);
  static uint32_t initialEventTime;
- const uint32_t POWEROFF_DURATION_MILLISECONDS = 500;
- 
+-const uint32_t POWEROFF_DURATION_MILLISECONDS = 500;
++// chioff: was 500. At 500 ms the power-off screen is a single blink, which is
++// too short to read the text let alone see the animation. 1440 ms = exactly
++// three 480 ms loops of the Thompson burst. Revert this one line to restore
++// stock shutdown timing.
++const uint32_t POWEROFF_DURATION_MILLISECONDS = 1440;
++
 +// --- Chicago Offline power-off animation -----------------------------------
 +// Only for the 160x128 colour panels (MDUV380/RT3S, RT84_DM1701, MD380, MD2017 --
 +// all DISPLAY_H_EXTRA_PIXELS == 32). MD9600 and RD5R define it as 0 and have a far
@@ -189,11 +194,10 @@ index a92203e..3dff548 100644
 +static uint32_t tgAnimStartTime;
 +static uint8_t  tgLastFrame;
 +#endif
-+
+ 
  menuStatus_t uiPowerOff(uiEvent_t *ev, bool isFirstRun)
  {
- 	if (isFirstRun)
-@@ -49,7 +74,11 @@ menuStatus_t uiPowerOff(uiEvent_t *ev, bool isFirstRun)
+@@ -49,7 +78,11 @@ menuStatus_t uiPowerOff(uiEvent_t *ev, bool isFirstRun)
  		}
  #endif
  
@@ -206,7 +210,7 @@ index a92203e..3dff548 100644
  		initialEventTime = ev->time;
  	}
  	else
-@@ -59,28 +88,105 @@ menuStatus_t uiPowerOff(uiEvent_t *ev, bool isFirstRun)
+@@ -59,28 +92,102 @@ menuStatus_t uiPowerOff(uiEvent_t *ev, bool isFirstRun)
  	return MENU_STATUS_SUCCESS;
  }
  
@@ -225,9 +229,9 @@ index a92203e..3dff548 100644
 +#endif
  
  	displayClearBuf();
- 	displayThemeApply(THEME_ITEM_FG_DECORATION, THEME_ITEM_BG_NOTIFICATION);
- 	displayDrawRoundRectWithDropShadow(4, 4, 120 + DISPLAY_H_EXTRA_PIXELS, DISPLAY_SIZE_Y - 6, 5, true);
- 
+-	displayThemeApply(THEME_ITEM_FG_DECORATION, THEME_ITEM_BG_NOTIFICATION);
+-	displayDrawRoundRectWithDropShadow(4, 4, 120 + DISPLAY_H_EXTRA_PIXELS, DISPLAY_SIZE_Y - 6, 5, true);
+-
  	displayThemeApply(THEME_ITEM_FG_WARNING_NOTIFICATION, THEME_ITEM_BG_NOTIFICATION);
 +#if !TG_ANIMATION_SUPPORTED
 +	// Stock screen, unchanged, for the small-display platforms.
@@ -246,7 +250,7 @@ index a92203e..3dff548 100644
 +
 +		// Gun body in the decoration colour.
 +		displayThemeApply(THEME_ITEM_FG_DECORATION, THEME_ITEM_BG_NOTIFICATION);
-+		displayDrawBitmap(gx, gy, (uint8_t *)tgGun, TG_GUN_W, TG_GUN_H, false);
++		displayDrawBitmap(gx, gy, (uint8_t *)tgGun, TG_GUN_W, TG_GUN_H, true);
 +
 +		// Muzzle flash and brass in the warning colour.
 +		displayThemeApply(THEME_ITEM_FG_WARNING_NOTIFICATION, THEME_ITEM_BG_NOTIFICATION);
@@ -254,15 +258,15 @@ index a92203e..3dff548 100644
 +		{
 +			case 1:
 +				displayDrawBitmap(gx + TG_MUZZLE_X + TG_FLASH1_DX, gy + TG_MUZZLE_Y + TG_FLASH1_DY,
-+						(uint8_t *)tgFlash1, TG_FLASH1_W, TG_FLASH1_H, false);
++						(uint8_t *)tgFlash1, TG_FLASH1_W, TG_FLASH1_H, true);
 +				break;
 +			case 2:
 +				displayDrawBitmap(gx + TG_MUZZLE_X + TG_FLASH2_DX, gy + TG_MUZZLE_Y + TG_FLASH2_DY,
-+						(uint8_t *)tgFlash2, TG_FLASH2_W, TG_FLASH2_H, false);
++						(uint8_t *)tgFlash2, TG_FLASH2_W, TG_FLASH2_H, true);
 +				break;
 +			case 3:
 +				displayDrawBitmap(gx + TG_MUZZLE_X + TG_FLASH3_DX, gy + TG_MUZZLE_Y + TG_FLASH3_DY,
-+						(uint8_t *)tgFlash3, TG_FLASH3_W, TG_FLASH3_H, false);
++						(uint8_t *)tgFlash3, TG_FLASH3_W, TG_FLASH3_H, true);
 +				break;
 +			default:
 +				break;
@@ -271,7 +275,7 @@ index a92203e..3dff548 100644
 +		// Ejected shells. displaySetPixel() rather than displayFillRect():
 +		// displayDrawFastVLine() passes !isInverted to fillRect, so that call's
 +		// polarity is ambiguous, whereas displayDrawBitmap lights a pixel with
-+		// displaySetPixel(.., false). This keeps the brass consistent with the gun.
++		// displaySetPixel(.., true). This keeps the brass consistent with the gun.
 +		for (uint8_t i = tgShellIdx[frame]; i < tgShellIdx[frame + 1]; i++)
 +		{
 +			int16_t sx = gx + tgShells[i].dx;
@@ -283,7 +287,7 @@ index a92203e..3dff548 100644
 +			{
 +				for (int16_t xx = 0; xx < sw; xx++)
 +				{
-+					displaySetPixel(sx + xx, sy + yy, false);
++					displaySetPixel(sx + xx, sy + yy, true);
 +				}
 +			}
 +		}

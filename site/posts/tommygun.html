@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The power-off animation &mdash; gd77-mods</title>
+<meta name="description" content="A Thompson and ejecting brass on the OpenGD77 power-off screen, the free frame clock hiding in the menu tick, and the one inverted boolean that drew the whole thing in the background colour.">
+<link rel="canonical" href="https://gd77-mods.chicagooffline.com/posts/tommygun.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="The power-off animation">
+<meta property="og:description" content="A Thompson and ejecting brass on the OpenGD77 power-off screen, and the inverted boolean that rendered it perfectly and invisibly.">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <img src="../logo.svg" alt="">
+    <a class="home" href="../">gd77-mods</a>
+    <span class="calls">KC9MHE &middot; WRXC682</span>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <h1>The power-off animation</h1>
+  <p class="meta">OpenGD77 &middot; MD-UV380 / RT3S</p>
+
+  <p class="lede">
+    Stock OpenGD77 says <code>POWER OFF</code> and <code>73</code> and then the
+    radio goes away. It is about a second and a half of screen time that nobody
+    was using, so it now has a Thompson in it.
+  </p>
+
+  <p>
+    This one is a sibling of <a href="boot-animation.html">the boot screen
+    mod</a> &mdash; same problem, opposite end of the session. It also turned
+    into a much better debugging story than I wanted at the time.
+  </p>
+
+  <h2>There is a frame clock already, and it is free</h2>
+
+  <p>
+    The splash screen has no animation loop, which is the whole reason the boot
+    mod needed a timer callback. I assumed the power-off screen would be the
+    same and started looking for somewhere to hang one.
+  </p>
+
+  <p>
+    It is not the same. The menu dispatcher calls the current screen's
+    <code>handleEvent()</code> on every tick, whether or not anything actually
+    happened:
+  </p>
+
+  <pre><code>menuControlData.stack[menuControlData.currentItem].function(ev, false);</code></pre>
+
+  <p>
+    No <code>ev-&gt;hasEvent</code> gate. And <code>ev-&gt;time</code> is
+    refreshed from <code>ticksGetMillis()</code> before each dispatch, so the
+    screen is handed a live millisecond clock a few hundred times a second for
+    free. Stash the time on <code>isFirstRun</code>, subtract, divide by the
+    frame length:
+  </p>
+
+  <pre><code>uint8_t frame = ((ev-&gt;time - tgAnimStartTime) / TG_FRAME_MS) % TG_FRAMES;</code></pre>
+
+  <p>
+    Redraw only when <code>frame</code> differs from the last one drawn. No
+    timer, no callback, no re-arming, nothing to tear down when the screen
+    exits.
+  </p>
+
+  <h2>What is actually drawn</h2>
+
+  <p>
+    The gun is 120&times;40, one bit, row-major and MSB-first with each scanline
+    padded to whole bytes &mdash; 15 bytes a row, 40 rows, 600 bytes of flash.
+    That is the layout <code>displayDrawBitmap()</code> expects, so it goes
+    straight to the panel with no conversion step.
+  </p>
+
+  <p>
+    Twelve frames at 40 ms is a 480 ms loop. Recoil and muzzle flash are small
+    lookup tables rather than logic:
+  </p>
+
+  <pre><code>static const uint8_t tgRecoil[TG_FRAMES]    = { 4, 2, 1, 4, 2, 1, 4, 2, 1, 4, 2, 1 };
+static const uint8_t tgFlashSize[TG_FRAMES] = { 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3, 1 };</code></pre>
+
+  <p>
+    Four bursts per loop. The recoil value shifts the whole gun left by a few
+    pixels on the firing frame and lets it walk back; the flash index picks one
+    of three sprites pinned to the muzzle at <code>TG_MUZZLE_X 119</code>,
+    <code>TG_MUZZLE_Y 5</code>. The largest is 23&times;25, the smallest
+    10&times;11, and cycling big-bigger-small is what keeps it from looking like
+    a blinking lamp.
+  </p>
+
+  <p>
+    Brass is 48 pre-computed shell positions indexed per frame, so the casings
+    arc out and tumble on a fixed path instead of being simulated. The entire
+    mod is a little over 900 bytes of sprite data and no floating point.
+  </p>
+
+  <h2>Giving it time to be seen</h2>
+
+  <p>
+    Stock gives the power-off screen 500 ms, which is one loop and a bit &mdash;
+    long enough to look like a glitch. That constant is now three clean loops:
+  </p>
+
+  <pre><code>const uint32_t POWEROFF_DURATION_MILLISECONDS = 1440;</code></pre>
+
+  <p>
+    1440 is exactly 3 &times; 480, so the animation ends on a frame boundary
+    rather than being cut mid-burst.
+  </p>
+
+  <p>
+    The stock screen's rounded rectangle and drop shadow are gone. At this size
+    the frame was just a box drawn around a gun, and losing it gives the sprite
+    the full panel width.
+  </p>
+
+  <h2>The boolean that cost an evening</h2>
+
+  <p>
+    The first build compiled clean, flashed clean, and showed the
+    <code>POWER OFF</code> text on a blank screen. No gun, no flash, no brass.
+  </p>
+
+  <p>
+    I spent a while on the wrong suspects, and they were all plausible. Maybe
+    the <code>TG_ANIMATION_SUPPORTED</code> guard was failing and the stock
+    branch was compiled in. Maybe the preprocessor nesting was wrong and the
+    drawing code sat in a dead <code>#if</code>. Maybe the sprite table was
+    empty. Every one of those was checkable, and every one of them came back
+    fine: the guard passes on a 160&times;128 panel, the <code>#else</code>
+    branch is live, and the gun table has 245 non-zero bytes in it.
+  </p>
+
+  <p>
+    The actual answer was one line down in the display layer:
+  </p>
+
+  <pre><code>screenBuf[i] = isInverted ? foregroundColour : backgroundColour;</code></pre>
+
+  <p>
+    <code>displayDrawBitmap()</code> passes its last argument straight through
+    to <code>displaySetPixel()</code>, and I had been passing
+    <code>false</code>. The parameter is called <code>isInverted</code>, so
+    <code>false</code> reads like <em>not inverted, draw it normally</em>. What
+    it means is <em>paint the background colour</em>.
+  </p>
+
+  <p>
+    So the gun was being drawn. Correctly, every frame, in exactly the colour of
+    the screen behind it. The text was visible the whole time because the font
+    renderer does not go through <code>displaySetPixel()</code> &mdash; which is
+    precisely why the symptom pointed away from the real cause.
+  </p>
+
+  <div class="note">
+    <p>
+      This is the second inverted boolean in the same display layer. The boot
+      mod has the opposite problem: in <code>displayConvertGD77ImageData()</code>
+      a <em>set</em> bit paints the background, so an intuitively packed image
+      comes out as a negative. Two different inversions, two different
+      functions, no consistent rule between them. Assume nothing about polarity
+      here and check the implementation every time.
+    </p>
+  </div>
+
+  <p>
+    Six call sites were wrong &mdash; gun body, three muzzle flashes and the
+    brass loop. Flipping them to <code>true</code> fixed all of it at once. The
+    comment above the brass loop had confidently documented the wrong
+    convention, so that went too.
+  </p>
+
+  <h2>Not on the DM1701</h2>
+
+  <p>
+    The animation is gated on panel size:
+  </p>
+
+  <pre><code>#if (DISPLAY_SIZE_X &gt;= 160) &amp;&amp; (DISPLAY_SIZE_Y &gt;= 128)</code></pre>
+
+  <p>
+    That looks like it covers every colour target, but the DM1701 and RT84
+    define <code>DISPLAY_Y_OFFSET</code> as 8, which makes
+    <code>DISPLAY_SIZE_Y</code> 120 rather than 128. They fail the test and fall
+    back to the stock <code>POWER OFF</code> / <code>73</code> screen, which is
+    the intended outcome &mdash; a 120&times;40 sprite plus text does not fit in
+    120 rows. Worth knowing that the guard is doing real work rather than being
+    decorative.
+  </p>
+
+  <h2>Get the patch</h2>
+
+  <p>
+    <a href="../patches/chioff-tommygun.patch">chioff-tommygun.patch</a>
+    &mdash; a plain unified diff against the OpenGD77 <code>R20260131</code>
+    release source. Two files, 256 lines added, seven removed, nothing binary.
+  </p>
+
+  <pre><code>git apply --3way chioff-tommygun.patch</code></pre>
+
+  <p>
+    It touches <code>uiPowerOff.c</code> and adds
+    <code>chioff_tommygun.h</code>. No settings, no menus, no language strings,
+    nothing in the RF or codec paths. There is no toggle for it; it replaces the
+    power-off screen outright on panels that qualify.
+  </p>
+
+  <p>
+    Want different artwork? <a href="../tools/gen_tommygun.py">tools/gen_tommygun.py</a>
+    generates the header &mdash; sprites, recoil table and shell paths. Edit,
+    re-run, rebuild.
+  </p>
+
+  <h2>Where it stands</h2>
+
+  <p>
+    This one has run on hardware, which is the difference between this post and
+    the boot screen one. Builds clean under STM32CubeIDE headless with GCC
+    14.3.1, zero errors, and the five warnings are the pre-existing AMBE
+    absolute-branch ones that have nothing to do with this change.
+  </p>
+
+  <p>
+    There is still no firmware download. The image I flashed carries the other
+    mods from this site as well as a test override that forces the boot
+    animation ahead of any stored boot image, so it is not a clean single-mod
+    binary and I am not going to hand it out as one. Build it from the patch.
+  </p>
+
+  <p>
+    A capture will go here once I can film a screen that is in the process of
+    turning itself off.
+  </p>
+
+  <p class="dim"><a href="../">&larr; back</a></p>
+
+</main>
+
+<footer class="site">
+  <div class="wrap">
+    <p>Eric Muehlstein &mdash; KC9MHE (amateur), WRXC682 (GMRS).</p>
+    <p>Written with AI assistance. The radios, the testing and any mistakes are mine.</p>
+  </div>
+</footer>
+
+</body>
+</html>
