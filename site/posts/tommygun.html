@@ -230,10 +230,14 @@ static const uint8_t tgFlashSize[TG_FRAMES] = { 2, 3, 1, 2, 3, 1, 2, 3, 1, 2, 3,
   </p>
 
   <p>
-    There is still no firmware download. The image I flashed carries the other
-    mods from this site as well as a test override that forces the boot
-    animation ahead of any stored boot image, so it is not a clean single-mod
-    binary and I am not going to hand it out as one. Build it from the patch.
+    The exact image that was flashed and confirmed is published as
+    <a href="../firmware/chioff-chicago-combined-R20260131.bin">chioff-chicago-combined-R20260131.bin</a>.
+    It is not a tommygun-only build &mdash; it carries every mod on this site,
+    including the boot animation, and it sets
+    <code>CHIOFF_BOOT_ANIM_OVERRIDES_IMAGE</code>, which makes the skyline take
+    precedence over a boot image stored in your codeplug. If you want this mod
+    on its own, or you want to keep your stored boot image, build from the
+    patch instead.
   </p>
 
   <p>

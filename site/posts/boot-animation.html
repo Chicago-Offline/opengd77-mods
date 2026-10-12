@@ -27,12 +27,11 @@
   <h1>The animated boot screen</h1>
   <p class="meta">OpenGD77 &middot; MD-UV380 / RT3S / DM1701</p>
 
-  <div class="note warn">
+  <div class="note">
     <p>
-      <strong>This has never run on a radio.</strong> It compiles clean and the
-      patch applies to the stock release source, but nothing here has been
-      flashed or watched on a real panel. There is no firmware download yet.
-      Read the last section before you use any of this.
+      <strong>Confirmed on hardware.</strong> This has been flashed and watched
+      on an MD-UV380 / RT3S panel, and the skyline reads correctly at the
+      timings below. It has not been run on a DM1701 or RT84.
     </p>
   </div>
 
@@ -302,17 +301,21 @@ buf[...] = (((d &gt;&gt; (y &amp; 0x07)) &amp; 0x01) ? fgColour : bgColour);</co
   </p>
 
   <p>
-    What I still cannot claim: that it looks right. It has never been flashed, so
-    I do not know whether 90 ms a frame is too fast, whether 6 pixels a step
-    judders, or whether the skyline reads at all on a real transflective panel
-    rather than a monitor. Those are the first things I expect to want changed.
+    The open question when this was first written was whether it would actually
+    look right: whether 90 ms a frame is too fast, whether 6 pixels a step
+    judders, whether the skyline reads at all on a transflective panel rather
+    than a monitor. It does. The frame time and step size shipped unchanged from
+    the values guessed against a desktop preview, which was more luck than
+    judgement.
   </p>
 
   <p>
-    There is deliberately still no firmware download. The image I built also
-    carries the other mods from this site, so it is not a clean single-mod
-    binary, and I am not going to hand out untested firmware. Build it yourself
-    from the patch if you want it early.
+    There is still no single-mod binary for this one. The image that was flashed
+    and confirmed carries every mod on this site at once, and it is published as
+    <a href="../firmware/chioff-chicago-combined-R20260131.bin">chioff-chicago-combined-R20260131.bin</a>
+    rather than dressed up as a boot-screen-only build. Read the note on that
+    download before flashing it &mdash; it changes how a stored boot image
+    behaves. For this mod on its own, build from the patch.
   </p>
 
   <p>

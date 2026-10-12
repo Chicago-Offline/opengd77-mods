@@ -96,10 +96,10 @@ index a321575..3eef53d 100644
  #if defined(PLATFORM_MD9600)
  				if (codeplugChannelGetFlag(currentChannelData, CHANNEL_FLAG_OUT_OF_BAND) != 0)
 diff --git a/MDUV380_firmware/application/source/user_interface/uiUtilities.c b/MDUV380_firmware/application/source/user_interface/uiUtilities.c
-index 8bf3e5d..dc96cf5 100644
+index 8bf3e5d..39e1225 100644
 --- a/MDUV380_firmware/application/source/user_interface/uiUtilities.c
 +++ b/MDUV380_firmware/application/source/user_interface/uiUtilities.c
-@@ -1616,7 +1616,99 @@ void uiUtilityDisplayInformation(const char *str, displayInformation_t line, int
+@@ -1616,7 +1616,115 @@ void uiUtilityDisplayInformation(const char *str, displayInformation_t line, int
  				displayThemeApply(THEME_ITEM_FG_CHANNEL_NAME, THEME_ITEM_BG);
  			}
  #endif
@@ -124,7 +124,6 @@ index 8bf3e5d..dc96cf5 100644
 +				bool wideName;
 +				ucFont_t nameFont;
 +				bool nameDblHeight;
-+				int16_t lineH;
 +
 +				line1[0] = '\0';
 +				line2[0] = '\0';
@@ -161,34 +160,51 @@ index 8bf3e5d..dc96cf5 100644
 +					}
 +				}
 +
-+				/* The longest rendered line decides whether the wide font fits */
++				/* For single-line the longest line IS line1; for two-line
++				 * the fit test is done per-row below, so longest is only needed here for
++				 * the single-line path. */
 +				longest = (int)strlen(line1);
-+				if (twoLines && ((int)strlen(line2) > longest))
-+				{
-+					longest = (int)strlen(line2);
-+				}
 +
++				/* For single-line paths wideName uses line1 length (== longest above).
++				 * For two-line paths each row gets its own font decision below; this
++				 * shared wideName / nameFont / nameDblHeight is only used by the
++				 * single-line branch. */
 +				wideName = (dblHeight && settingsIsOptionBitSet(BIT_UI_WIDE_NAME) &&
 +						(longest <= (DISPLAY_SIZE_X / WIDE_CHAR_WIDTH)));
 +				nameFont = (wideName ? FONT_SIZE_4 : FONT_SIZE_3);
 +				nameDblHeight = (wideName ? false : dblHeight);
-+				lineH = (int16_t)(dblHeight ? FONT_SIZE_4_HEIGHT : FONT_SIZE_3_HEIGHT);
 +
 +				if (twoLines)
 +				{
++					/* chioff-bigname: font selected per row so that a short line1 (e.g. "GMRS")
++					 * always gets the wide font even when line2 is too long for it.
++					 * Y positions are computed from each row's own pixel height so that a
++					 * mixed-font pair (e.g. SIZE_4 top / SIZE_3 bottom) still centres correctly. */
++					{
++						const int wideMax = DISPLAY_SIZE_X / WIDE_CHAR_WIDTH; /* 10 chars */
++						const bool wideNameBase = (dblHeight && settingsIsOptionBitSet(BIT_UI_WIDE_NAME));
++						const bool wideLine1 = (wideNameBase && ((int)strlen(line1) <= wideMax));
++						const bool wideLine2 = (wideNameBase && ((int)strlen(line2) <= wideMax));
++						const int16_t h1 = (int16_t)(wideLine1 ? FONT_SIZE_4_HEIGHT : (dblHeight ? FONT_SIZE_4_HEIGHT : FONT_SIZE_3_HEIGHT));
++						const int16_t h2 = (int16_t)(wideLine2 ? FONT_SIZE_4_HEIGHT : (dblHeight ? FONT_SIZE_4_HEIGHT : FONT_SIZE_3_HEIGHT));
 +#if defined(PLATFORM_MDUV380) || defined(PLATFORM_MD380) || defined(PLATFORM_RT84_DM1701) || defined(PLATFORM_MD2017)
-+					/* Screen 160x128. Header ~16px, zone footer at y=114, so the usable
-+					 * band is y=16..110 = 94px. Centre two lines plus a 6px gap in it. */
-+					const int16_t gap = 6;
-+					const int16_t offset = (int16_t)((94 - ((2 * lineH) + gap)) / 2);
-+					const int16_t y1 = (int16_t)(16 + offset);
-+					const int16_t y2 = (int16_t)(y1 + lineH + gap);
++						/* Screen 160x128. Header ~16px, zone footer at y=114, so the usable
++						 * band is y=16..110 = 94px. Centre the two rows plus a 6px gap in it. */
++						const int16_t gap = 6;
++						const int16_t offset = (int16_t)((94 - (h1 + gap + h2)) / 2);
++						const int16_t y1 = (int16_t)(16 + offset);
++						const int16_t y2 = (int16_t)(y1 + h1 + gap);
 +#else
-+					const int16_t y1 = (int16_t)DISPLAY_Y_POS_CHANNEL_FIRST_LINE;
-+					const int16_t y2 = (int16_t)(DISPLAY_Y_POS_CHANNEL_FIRST_LINE + lineH + 2);
++						const int16_t y1 = (int16_t)DISPLAY_Y_POS_CHANNEL_FIRST_LINE;
++						const int16_t y2 = (int16_t)(DISPLAY_Y_POS_CHANNEL_FIRST_LINE + h1 + 2);
 +#endif
-+					displayPrintCoreDoubleHeight(0, y1, line1, nameFont, TEXT_ALIGN_CENTER, inverted, nameDblHeight);
-+					displayPrintCoreDoubleHeight(0, y2, line2, nameFont, TEXT_ALIGN_CENTER, inverted, nameDblHeight);
++						displayPrintCoreDoubleHeight(0, y1, line1,
++								(wideLine1 ? FONT_SIZE_4 : FONT_SIZE_3), TEXT_ALIGN_CENTER, inverted,
++								(wideLine1 ? false : dblHeight));
++						displayPrintCoreDoubleHeight(0, y2, line2,
++								(wideLine2 ? FONT_SIZE_4 : FONT_SIZE_3), TEXT_ALIGN_CENTER, inverted,
++								(wideLine2 ? false : dblHeight));
++					}
 +				}
 +				else
 +				{
@@ -200,7 +216,7 @@ index 8bf3e5d..dc96cf5 100644
  			break;
  
  		case DISPLAY_INFO_CHANNEL_DETAILS:
-@@ -1688,7 +1780,17 @@ void uiUtilityDisplayInformation(const char *str, displayInformation_t line, int
+@@ -1688,7 +1796,17 @@ void uiUtilityDisplayInformation(const char *str, displayInformation_t line, int
  
  		case DISPLAY_INFO_TX_TIMER:
  			displayThemeApply(THEME_ITEM_FG_TX_COUNTER, THEME_ITEM_BG);
